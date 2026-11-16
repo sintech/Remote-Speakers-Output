@@ -1,6 +1,6 @@
 # Added 2026-11-16. SPDX-License-Identifier: GPL-3.0-or-later
 [CmdletBinding()]
-param()
+param([switch] $DependenciesOnly)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
@@ -69,6 +69,8 @@ if (-not (Test-Path "$prefix/lib/cmake/Poco/PocoConfig.cmake")) {
     Invoke-Checked -program cmake -arguments $pocoArgs
     Invoke-Checked -program cmake -arguments @('--build', "$deps/poco-build", '--config', 'Release', '--target', 'install', '--parallel', '2')
 }
+
+if ($DependenciesOnly) { return }
 
 Invoke-Checked -program cmake -arguments @('-S', $root, '-B', 'build', '-G', 'Visual Studio 17 2022', '-A', 'Win32')
 Invoke-Checked -program cmake -arguments @('--build', 'build', '--config', 'Release', '--parallel', '2')

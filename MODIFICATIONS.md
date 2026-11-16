@@ -12,6 +12,10 @@
   selected UTF-8 resource code pages and made icon paths relative to the root.
 - Added a CMake Winamp/core build, pinned dependency bootstrap, Windows x86
   GitHub Actions workflow and DLL/interface loading check.
+- Selected the modern CRT's `lrint`/`lrintf` for libsamplerate, avoiding its
+  legacy fallback definitions that conflict with MSVC 2022 intrinsics.
+- Cached installed dependencies before plugin compilation and enabled automatic
+  cancellation of outdated builds on the same branch.
 - Selected GPL-3.0-or-later for the combined build with Apache-2.0 dependencies.
 
 Foobar2000 and XMPlay source is retained but is not built by the new workflow.

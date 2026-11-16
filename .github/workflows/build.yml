@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: winamp-x86-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   winamp:
     runs-on: windows-2022
@@ -30,10 +34,24 @@ jobs:
           cl.exe 2>&1 | ForEach-Object { Write-Host $_ }
           exit 0
       - name: Cache dependency builds
-        uses: actions/cache@v4
+        id: deps-cache
+        uses: actions/cache/restore@v4
         with:
-          path: .deps
-          key: deps-windows2022-x86-v1-${{ hashFiles('scripts/dependencies.json', 'scripts/build.ps1') }}
+          path: |
+            .deps/install
+            .deps/downloads
+          key: deps-windows2022-x86-v2-${{ env.VCToolsVersion }}-${{ hashFiles('scripts/dependencies.json', 'scripts/build.ps1') }}
+      - name: Build dependencies
+        shell: pwsh
+        run: ./scripts/build.ps1 -DependenciesOnly
+      - name: Save dependency builds
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .deps/install
+            .deps/downloads
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
       - name: Build and check DLL loading
         shell: pwsh
         run: ./scripts/build.ps1

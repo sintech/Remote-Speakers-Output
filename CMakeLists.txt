@@ -22,7 +22,8 @@ add_library(samplerate STATIC
   "${DEPS}/samplerate/src/src_zoh.c")
 target_include_directories(samplerate PUBLIC "${DEPS}/samplerate/src"
   PRIVATE "${DEPS}/samplerate/Win32")
-target_compile_definitions(samplerate PRIVATE WIN32 _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(samplerate PRIVATE WIN32 _CRT_SECURE_NO_WARNINGS
+  HAVE_LRINT=1 HAVE_LRINTF=1)
 
 file(GLOB CORE_SOURCES CONFIGURE_DEPENDS
   rsoutput/src/core/impl/*.cpp rsoutput/src/core/impl/raop/*.cpp
