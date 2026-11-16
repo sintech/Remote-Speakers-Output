@@ -52,6 +52,14 @@ Outputs are in `dist/`. Dependencies are downloaded and built under `.deps/`.
 To rebuild dependencies from scratch, remove `.deps/`. No credentials or secrets
 are required by the workflow.
 
+## Playback diagnostics
+
+This build writes a bounded (2 MiB) UTF-8 log to `%TEMP%\out_apx.log`.
+Close Winamp, delete an old log if present, start Winamp and try playback once.
+The log records initialization stages, receiver connection, RTSP method/status
+and exceptions. It does not log raw RTSP authentication headers or audio keys.
+Attach the log when reporting a failure. It stays local until you share it.
+
 ## Source and licensing
 
 The upstream source headers grant **GPL-2.0-or-later**; `!LICENSE.txt` and the

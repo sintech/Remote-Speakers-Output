@@ -54,5 +54,26 @@ enable_testing()
 add_executable(plugin_smoke tests/plugin_smoke.cpp)
 target_include_directories(plugin_smoke PRIVATE winamp/sdk)
 add_test(NAME plugin_load COMMAND plugin_smoke "$<TARGET_FILE:out_apx>")
+add_executable(core_startup tests/core_startup.cpp
+  rsoutput/src/core/impl/raop/RAOPEngine.cpp
+  rsoutput/src/core/impl/raop/RAOPDevice.cpp
+  rsoutput/src/core/impl/raop/RTSPClient.cpp
+  rsoutput/src/core/impl/raop/NTPTimestamp.cpp
+  rsoutput/src/core/impl/raop/PacketBuffer.cpp
+  rsoutput/src/core/impl/OutputFormat.cpp
+  rsoutput/src/core/impl/OutputMetadata.cpp
+  rsoutput/src/core/impl/Debugger.cpp
+  rsoutput/src/core/impl/Platform.cpp
+  rsoutput/src/core/impl/Plugin.cpp)
+target_include_directories(core_startup PRIVATE rsoutput/sdk rsoutput/src/core
+  rsoutput/src/core/impl/raop "${DEPS}/alac/codec")
+target_compile_definitions(core_startup PRIVATE RSOUTPUT_EXPORTS POCO_STATIC
+  POCO_NO_AUTOMATIC_LIBS UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN
+  _WIN32_WINNT=0x0601 _CRT_SECURE_NO_WARNINGS _WINSOCK_DEPRECATED_NO_WARNINGS)
+target_compile_options(core_startup PRIVATE /utf-8 /MP)
+target_link_libraries(core_startup PRIVATE Poco::Foundation Poco::Net
+  OpenSSL::Crypto advapi32 bcrypt crypt32 gdi32 iphlpapi user32 ws2_32)
+add_test(NAME core_session_startup COMMAND core_startup)
+set_tests_properties(core_session_startup PROPERTIES TIMEOUT 30)
 install(TARGETS apxCore RUNTIME DESTINATION .)
 install(TARGETS out_apx RUNTIME DESTINATION Plugins)

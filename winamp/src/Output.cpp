@@ -71,6 +71,7 @@ std::string Output::_titleString(INVALID_TITLE);
 
 void Output::init()
 {
+	Debugger::print("Winamp Init: core build " + Plugin::version());
 	try
 	{
 		// initialize plug-in options file path
@@ -112,6 +113,7 @@ void Output::init()
 
 		_outputComponent.reset(new OutputComponent(*player));
 		_outputComponent->setProgressCallback(&Output::onBytesOutput);
+		Debugger::print("Winamp Init: output component ready.");
 
 		// sniff for additional player capabilities...
 
@@ -220,6 +222,8 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 	const int bitsPerSample, const int bufferLengthMilliseconds,
 	const int preBufferMilliseconds)
 {
+	Debugger::printf("Winamp Open: %d Hz, %d channels, %d bits.",
+		samplesPerSecond, channelCount, bitsPerSample);
 	try
 	{
 		_resetToZero = 0;
@@ -230,8 +234,10 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 		buffer_t    artworkData;
 		std::string artworkType;
 		shorts_t    playlistPos;
+		Debugger::print("Winamp Open: querying track metadata.");
 		const time_t length = player->getPlaybackMetadata(
 			title, album, artist, artworkData, artworkType, playlistPos);
+		Debugger::print("Winamp Open: track metadata retrieved.");
 
 		const OutputFormat format(SampleRate(samplesPerSecond),
 			SampleSize(bitsPerSample / 8), ChannelCount(channelCount));
@@ -240,7 +246,9 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 
 		ASSERT_NOT_NULL(_outputComponent);
 
+		Debugger::print("Winamp Open: opening output session.");
 		_outputComponent->open(format, metadata);
+		Debugger::print("Winamp Open: output session opened.");
 
 		_titleString = title;
 
@@ -251,11 +259,13 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 
 		// return playback latency
 		const time_t latency = _outputComponent->latency();
+		Debugger::printf("Winamp Open: ready, latency %lld ms.", static_cast<long long>(latency));
 		assert(latency <= static_cast<time_t>(std::numeric_limits<int>::max()));
 		return static_cast<int>(latency);
 	}
 	CATCH_ALL
 
+	Debugger::print("Winamp Open: FAILED; returning -1 to Winamp. See previous exception.");
 	return -1;
 }
 

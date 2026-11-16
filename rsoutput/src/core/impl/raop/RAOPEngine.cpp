@@ -34,6 +34,7 @@
 #include <mswsock.h>
 #include <openssl/aes.h>
 #include <openssl/evp.h>
+#include <openssl/err.h>
 #include <openssl/rsa.h>
 #include <Poco/ByteOrder.h>
 #include <Poco/Format.h>
@@ -64,6 +65,14 @@ using Poco::Net::IPAddress;
 using Poco::Net::SocketAddress;
 using Poco::Net::ReadableNotification;
 
+static std::string opensslFailure(const char* operation)
+{
+	const unsigned long code = ERR_get_error();
+	if (!code) return operation;
+	char detail[256];
+	ERR_error_string_n(code, detail, sizeof(detail));
+	return std::string(operation) + ": " + detail;
+}
 
 // default ports to use for RTP control and timing
 static const uint16_t LOCAL_CONTROL_PORT = 6001;
@@ -258,7 +267,7 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	_rsaKey.reset(RSA_new(), RSA_free);
 	if (_rsaKey.get() == NULL)
 	{
-		throw std::runtime_error("RSA_new failed");
+		throw std::runtime_error(opensslFailure("RSA_new failed"));
 	}
 
 	// Updated 2026-11-16: RSA is opaque in OpenSSL 1.1 and newer.
@@ -269,7 +278,7 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	{
 		BN_free(modulusBn);
 		BN_free(exponentBn);
-		throw std::runtime_error("RSA_set0_key failed");
+		throw std::runtime_error(opensslFailure("RSA_set0_key failed"));
 	}
 	// Ownership of both BIGNUMs has transferred to RSA.
 
@@ -343,7 +352,7 @@ void RAOPEngine::reinit(OutputInterval& outputInterval)
 		rsaKey(), RSA_PKCS1_OAEP_PADDING);
 	if (encryptedKeyLength <= 0 || encryptedKeyLength > (int) encryptedKey.size())
 	{
-		throw std::runtime_error("RSA_public_encrypt failed");
+		throw std::runtime_error(opensslFailure("RSA_public_encrypt failed"));
 	}
 
 	// base64 encode RSA-encrypted AES key

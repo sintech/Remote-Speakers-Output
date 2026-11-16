@@ -61,6 +61,7 @@ DeviceManager::~DeviceManager()
 
 void DeviceManager::openDevices()
 {
+	Debugger::print("DeviceManager: opening selected receivers.");
 	bool anyDeviceActivated = false;
 
 	// hold reference to active options
@@ -73,6 +74,7 @@ void DeviceManager::openDevices()
 
 		if (options->isActivated(deviceInfo.name()))
 		{
+			Debugger::printf("DeviceManager: selected receiver, type=%i.", (int) deviceInfo.type());
 			anyDeviceActivated = true;
 
 			openDevice(deviceInfo);
@@ -291,6 +293,7 @@ void DeviceManager::destroyDevice(const DeviceInfo& deviceInfo)
 
 void DeviceManager::openDevice(const DeviceInfo& deviceInfo)
 {
+	Debugger::print("DeviceManager: preparing receiver and RAOP engine.");
 	try
 	{
 		ScopedLock lock(_mutex);
@@ -374,6 +377,7 @@ void DeviceManager::openDevice(const DeviceInfo& deviceInfo)
 			{
 				// before opening the first device, init shared session state
 				RAOP_ENGINE.reinit(_outputInterval);
+				Debugger::print("DeviceManager: RSA/AES/ALAC session initialized.");
 			}
 
 			// run dialog box that will asynchronously resolve service name to

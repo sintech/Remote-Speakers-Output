@@ -1,5 +1,12 @@
 # Changes from upstream 5.6
 
+Playback diagnostics, 2026-11-16:
+
+- Added a bounded local `%TEMP%\out_apx.log` file with timestamps and thread IDs.
+- Logged the Winamp initialization/open stages and RAOP setup stages.
+- Replaced raw RTSP request/response dumps with method/status summaries so the
+  diagnostic file omits authentication headers, stream keys and metadata bodies.
+
 2026-11-16:
 
 - Imported the original source tree, retaining copyright and license notices.
