@@ -299,7 +299,6 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	// Ownership of both BIGNUMs has transferred to RSA.
 
 	// reduce time to send by disabling blocking
-	Debugger::print("RAOP engine: RSA public key ready; configuring UDP sockets.");
 	_controlSocket.setBlocking(false);
 	_timingSocket.setBlocking(false);
 	_dataSocket.setBlocking(false);
@@ -319,7 +318,6 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	_socketReactor.addEventHandler(_controlSocket, _controlRequestHandler);
 	_socketReactor.addEventHandler(_timingSocket, _timingRequestHandler);
 	_reactorThread.start(_socketReactor);
-	Debugger::print("RAOP engine: UDP sockets and reactor ready.");
 }
 
 
@@ -355,7 +353,6 @@ void RAOPEngine::reinit(OutputInterval& outputInterval, unsigned int syncLatency
 	if (syncLatencyMs < 100 || syncLatencyMs > 2000)
 		throw std::invalid_argument("Sync delay must be between 100 and 2000 ms");
 	_streamSyncDelaySamples = (RAOP_SAMPLES_PER_SECOND * syncLatencyMs) / 1000U;
-	Debugger::printf("RAOP session: configured sync delay %u ms.", syncLatencyMs);
 
 	// generate new AES encryption key
 	buffer_t key(16);
@@ -797,8 +794,6 @@ size_t RAOPEngine::sendDataPacket(const Timestamp& currentTime)
 	if (packetHeader.getMarker())
 	{
 		_firstDataTime = currentTime;
-		Debugger::printf("RAOP stream: first audio packet sent; sync delay %u ms.",
-			(_streamSyncDelaySamples * 1000U) / RAOP_SAMPLES_PER_SECOND);
 	}
 
 	// update counters

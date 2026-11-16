@@ -87,8 +87,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,0,0,0
- PRODUCTVERSION 0,0,0,0
+ FILEVERSION 6,0,0,0
+ PRODUCTVERSION 6,0,0,0
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -104,9 +104,9 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "Remote Speakers output"
-            VALUE "FileVersion", "0, 0, 0, 0"
+            VALUE "FileVersion", "6.0.0.0"
             VALUE "LegalCopyright", "Copyright © 2008-2021  Eric Milles"
-            VALUE "ProductVersion", "0, 0, 0, 0"
+            VALUE "ProductVersion", "6.0"
         END
     END
     BLOCK "VarFileInfo"

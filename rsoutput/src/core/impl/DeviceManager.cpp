@@ -61,7 +61,6 @@ DeviceManager::~DeviceManager()
 
 void DeviceManager::openDevices()
 {
-	Debugger::print("DeviceManager: opening selected receivers.");
 	bool anyDeviceActivated = false;
 
 	// hold reference to active options
@@ -70,7 +69,6 @@ void DeviceManager::openDevices()
 	// Stop normally keeps receivers connected for eight seconds. A changed
 	// delay needs a fresh session even when Play follows Stop immediately.
 	if (_sessionSyncLatencyMs != 0 && _sessionSyncLatencyMs != options->getSyncLatencyMs()) {
-		Debugger::print("DeviceManager: reopening receivers for the new playback delay.");
 		closeDevices();
 	}
 
@@ -81,7 +79,6 @@ void DeviceManager::openDevices()
 
 		if (options->isActivated(deviceInfo.name()))
 		{
-			Debugger::printf("DeviceManager: selected receiver, type=%i.", (int) deviceInfo.type());
 			anyDeviceActivated = true;
 
 			openDevice(deviceInfo);
@@ -300,7 +297,6 @@ void DeviceManager::destroyDevice(const DeviceInfo& deviceInfo)
 
 void DeviceManager::openDevice(const DeviceInfo& deviceInfo)
 {
-	Debugger::print("DeviceManager: preparing receiver and RAOP engine.");
 	try
 	{
 		ScopedLock lock(_mutex);
@@ -386,7 +382,6 @@ void DeviceManager::openDevice(const DeviceInfo& deviceInfo)
 				const unsigned int delay = Options::getOptions()->getSyncLatencyMs();
 				RAOP_ENGINE.reinit(_outputInterval, delay);
 				_sessionSyncLatencyMs = delay;
-				Debugger::print("DeviceManager: RSA/AES/ALAC session initialized.");
 			}
 
 			// run dialog box that will asynchronously resolve service name to

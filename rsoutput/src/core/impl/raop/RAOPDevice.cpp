@@ -194,8 +194,6 @@ int RAOPDevice::open(StreamSocket& socket, AudioJackStatus& audioJackStatus)
 	}
 
 	_raopEngine.attach(this);
-	Debugger::printf("RAOP receiver: Audio-Latency header = %u samples (%.1f ms).",
-		_audioLatency, _audioLatency * 1000.0 / 44100.0);
 
 	return 0;
 }

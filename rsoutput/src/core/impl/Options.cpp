@@ -426,8 +426,6 @@ void OptionsUtils::loadOptions(const std::string& iniFilePath)
 		}
 		else
 		{
-			Debugger::printf(
-				"Read 'Device%i_Password' value '%s'.", index, parameterValue);
 
 			// base64 decode password string
 			parameterValueLength = EVP_DecodeBlock(
@@ -441,7 +439,6 @@ void OptionsUtils::loadOptions(const std::string& iniFilePath)
 			}
 			parameterValue[parameterValueLength] = '\0';
 
-			Debugger::printf("Decoded device password '%s'.", parameterValue);
 
 			options->setPassword(device.name(), parameterValue, true);
 		}
@@ -457,9 +454,6 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 {
 	Debugger::printf("Writing plug-in options to '%s'...", iniFilePath.c_str());
 
-	const bool enableArtwork = GetPrivateProfileIntA(Plugin::name().c_str(),
-		"EnableArtwork", 0, iniFilePath.c_str()) != 0;
-
 	// clear existing options in file
 	if (!WritePrivateProfileSectionA(Plugin::name().c_str(), "", iniFilePath.c_str()))
 	{
@@ -468,9 +462,6 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 	}
 
 	const Options::SharedPtr options = Options::getOptions();
-
-	WritePrivateProfileStringA(Plugin::name().c_str(), "EnableArtwork",
-		enableArtwork ? "1" : "0", iniFilePath.c_str());
 
 	WritePrivateProfileStringA(Plugin::name().c_str(), "SyncLatencyMs",
 		Poco::format("%u", options->getSyncLatencyMs()).c_str(), iniFilePath.c_str());
@@ -561,7 +552,6 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 			&& options->getRememberPassword(device.name()))
 		{
 			const std::string password = options->getPassword(device.name());
-			Debugger::printf("Encoding device password '%s'...", password.c_str());
 
 			int parameterValueLength;
 			char parameterValue[128];
@@ -582,8 +572,6 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 			WritePrivateProfileStringA(Plugin::name().c_str(),
 				Poco::format("Device%i_Password", index).c_str(),
 				parameterValue, iniFilePath.c_str());
-			Debugger::printf(
-				"Wrote 'Device%i_Password' value '%s'.", index, parameterValue);
 		}
 	}
 

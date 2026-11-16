@@ -1,5 +1,18 @@
 # Changes from upstream 5.6
 
+Release 6.0 preparation, 2026-11-16:
+
+- Set plugin/about/user-agent version to 6.0 and both Windows DLL resource
+  versions to 6.0.0.0. Verify the loaded plugin description and DLL resources.
+- Remove temporary artwork/startup/RTSP stage traces and the temporary file
+  logger. Release builds keep the explicit test callback but emit no debugger
+  output during ordinary logging. Remove credential dumps from option traces.
+- Enable fixed album artwork by default and remove the temporary EnableArtwork
+  INI switch. Keep UI-thread metadata scheduling and WIC encoding.
+- Replace the README with installation, playback settings, local build and
+  licensing information. Keep the project title independent of the media player.
+- Enable CI for main and 6.x tags as well as the development branch.
+
 Configurable playback sync delay, 2026-11-16:
 
 - Add a numeric Playback delay (ms) field to the existing options dialog, range

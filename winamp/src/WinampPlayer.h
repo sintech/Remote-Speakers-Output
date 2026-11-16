@@ -54,7 +54,7 @@ public:
 		std::string& artworkType,
 		shorts_t   & playlistPos,
 		bool allowFileMetadata = true,
-		bool allowArtwork = false) const;
+		bool allowArtwork = true) const;
 
 	time_t getPlaybackPosition() const;
 

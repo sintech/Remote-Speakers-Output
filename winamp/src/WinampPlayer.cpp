@@ -112,68 +112,48 @@ static void GetVisualFileInfo(buffer_t& imageData, std::string& imageType,
 	const wchar_t* const infoType, const wchar_t* const filePath,
 	api_service* const apiService, api_memmgr* const memMgmtService)
 {
-	Debugger::print("Artwork providers: counting services BEGIN.");
 	const size_t n = apiService->service_getNumServices(
 						svc_albumArtProvider::getServiceType());
-	Debugger::printf("Artwork providers: counting services END, count=%u.", (unsigned int) n);
 	for (size_t i = 0; i < n; ++i)
 	{
-		const unsigned int providerIndex = (unsigned int) i;
-		Debugger::printf("Artwork provider %u: enum BEGIN.", providerIndex);
 		waServiceFactory* const aapServiceFactory =
 			apiService->service_enumService(svc_albumArtProvider::getServiceType(), i);
-		Debugger::printf("Artwork provider %u: enum END, present=%i.", providerIndex, aapServiceFactory != NULL);
 		if (aapServiceFactory != NULL)
 		{
-			Debugger::printf("Artwork provider %u: getInterface BEGIN.", providerIndex);
 			svc_albumArtProvider* const aapService =
 				(svc_albumArtProvider*) aapServiceFactory->getInterface(FALSE);
-			Debugger::printf("Artwork provider %u: getInterface END, present=%i.", providerIndex, aapService != NULL);
 			if (aapService != NULL)
 			{
-				Debugger::printf("Artwork provider %u: IsMine BEGIN.", providerIndex);
 				const bool matches = aapService->IsMine(filePath);
-				Debugger::printf("Artwork provider %u: IsMine END, matches=%i.", providerIndex, (int) matches);
 				if (matches)
 				{
 					void*     data = 0;
 					size_t    size = 0;
 					wchar_t*  type = 0;
-					Debugger::printf("Artwork provider %u: GetAlbumArtData BEGIN.", providerIndex);
 					const int code = aapService->GetAlbumArtData(
 						filePath, infoType, &data, &size, &type);
-					Debugger::printf("Artwork provider %u: GetAlbumArtData END, code=%i, bytes=%u, data=%i, mime=%i.",
-						providerIndex, code, (unsigned int) size, data != NULL, type != NULL);
 					if (code == ALBUMARTPROVIDER_SUCCESS && data != 0)
 					{
 						if (size != 0 && type != 0)
 						{
-							Debugger::printf("Artwork provider %u: copying image and MIME BEGIN.", providerIndex);
 							imageData.resize(size);
 							std::memcpy(&imageData[0], data, size);
 							imageType = "image/" + ToUTF8(type);
-							Debugger::printf("Artwork provider %u: copying image and MIME END.", providerIndex);
 
 							i = n; // break out of loop after cleanup
 						}
 
 						if (data) {
-							Debugger::printf("Artwork provider %u: free image BEGIN.", providerIndex);
 							memMgmtService->sysFree(data);
-							Debugger::printf("Artwork provider %u: free image END.", providerIndex);
 						}
 						if (type) {
-							Debugger::printf("Artwork provider %u: free MIME BEGIN.", providerIndex);
 							memMgmtService->sysFree(type);
-							Debugger::printf("Artwork provider %u: free MIME END.", providerIndex);
 						}
 					}
 
 				}
 
-				Debugger::printf("Artwork provider %u: releaseInterface BEGIN.", providerIndex);
 				aapServiceFactory->releaseInterface(aapService);
-				Debugger::printf("Artwork provider %u: releaseInterface END.", providerIndex);
 			}
 
 		}
@@ -185,26 +165,19 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 	const wchar_t* const infoType, const wchar_t* const filePath,
 	api_service* const apiService, api_memmgr* const memMgmtService)
 {
-	Debugger::print("Artwork fallback: getServiceByGuid BEGIN.");
 	waServiceFactory* const aaServiceFactory =
 		apiService->service_getServiceByGuid(albumArtGUID);
-	Debugger::printf("Artwork fallback: getServiceByGuid END, present=%i.", aaServiceFactory != NULL);
 	if (aaServiceFactory != NULL)
 	{
-		Debugger::print("Artwork fallback: getInterface BEGIN.");
 		api_albumart* const aaService =
 			(api_albumart*) aaServiceFactory->getInterface(FALSE);
-		Debugger::printf("Artwork fallback: getInterface END, present=%i.", aaService != NULL);
 		if (aaService != NULL)
 		{
 			int       wdth = 0;
 			int       hght = 0;
 			ARGB32*   data = 0;
-			Debugger::print("Artwork fallback: GetAlbumArt BEGIN.");
 			const int code = aaService->GetAlbumArt(
 				filePath, infoType, &wdth, &hght, &data);
-			Debugger::printf("Artwork fallback: GetAlbumArt END, code=%i, width=%i, height=%i, data=%i.",
-				code, wdth, hght, data != NULL);
 			if (code == ALBUMART_SUCCESS && data != 0)
 			{
 				if (wdth > 0 && hght > 0)
@@ -214,15 +187,11 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 				}
 
 				if (data) {
-					Debugger::print("Artwork fallback: free pixels BEGIN.");
 					memMgmtService->sysFree(data);
-					Debugger::print("Artwork fallback: free pixels END.");
 				}
 			}
 
-			Debugger::print("Artwork fallback: releaseInterface BEGIN.");
 			aaServiceFactory->releaseInterface(aaService);
-			Debugger::print("Artwork fallback: releaseInterface END.");
 		}
 
 	}
@@ -270,7 +239,6 @@ static buffer_t ToJPEG(const ARGB32* data, int width, int height)
 			_com_issue_error(WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT);
 		const UINT stride = static_cast<UINT>(width) * 3;
 		std::vector<BYTE> row(stride);
-		Debugger::printf("Artwork WIC: encoding JPEG, width=%i height=%i.", width, height);
 		for (int y = 0; y < height; ++y) {
 			const ARGB32* source = data + static_cast<size_t>(y) * width;
 			for (int x = 0; x < width; ++x) {
@@ -292,7 +260,6 @@ static buffer_t ToJPEG(const ARGB32* data, int width, int height)
 		ULONG read = 0;
 		check(stream->Read(jpeg.data(), static_cast<ULONG>(jpeg.size()), &read));
 		if (read != jpeg.size()) _com_issue_error(E_FAIL);
-		Debugger::printf("Artwork WIC: JPEG ready, bytes=%u.", static_cast<unsigned>(jpeg.size()));
 	}
 	catch (const _com_error& error) {
 		Debugger::printf("Artwork WIC: JPEG failed, HRESULT=0x%08lX.", error.Error());
@@ -619,21 +586,17 @@ time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
 	// Open runs inside decoder startup; do not re-enter tag/artwork services.
 	if (!allowFileMetadata || GetCurrentThreadId() != GetWindowThreadProcessId(window(), NULL))
 	{
-		Debugger::print("Metadata: deferred until the Winamp UI thread is ready.");
 		return 0;
 	}
 	const LRESULT state = SendMessage(window(), WM_WA_IPC, 0, IPC_ISPLAYING);
 	if (state != 1 && state != 3) return 0;
-	Debugger::print("Metadata: querying current filename on UI thread.");
 	const wchar_t* const borrowedPath = sendMessage<wchar_t*>(IPC_GET_PLAYING_FILENAME);
 	const std::wstring ownedPath = (borrowedPath != NULL &&
 		borrowedPath != reinterpret_cast<const wchar_t*>(1)) ? borrowedPath : L"";
 	const wchar_t* const filePath = ownedPath.c_str();
 	if (!ownedPath.empty())
 	{
-		Debugger::print("Metadata: querying basic file info.");
 		GetBasicFileInfo(length, filePath, window());
-		Debugger::print("Metadata: querying text tags.");
 		GetTextualFileInfo(title, L"Title", filePath, window());
 		GetTextualFileInfo(album, L"Album", filePath, window());
 		GetTextualFileInfo(artist, L"Artist", filePath, window());
@@ -642,13 +605,11 @@ time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
 		{
 			if (_apiService == NULL)
 			{
-				Debugger::print("Metadata: acquiring Winamp services.");
 				// try to initialize player service interfaces
 				const_cast<WinampPlayer*>(this)->initServices();
 			}
 			if (_apiService != NULL && _memMgmtService != NULL)
 			{
-				Debugger::print("Metadata: querying album artwork.");
 				GetVisualFileInfo(artworkData, artworkType, L"cover",
 								filePath, _apiService, _memMgmtService);
 
@@ -660,7 +621,6 @@ time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
 				}
 			}
 		}
-		else Debugger::print("Metadata: album artwork disabled (EnableArtwork=0).");
 	}
 
 	if (length == 0)

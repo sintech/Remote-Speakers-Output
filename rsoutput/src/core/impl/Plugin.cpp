@@ -48,7 +48,7 @@ const std::string& Plugin::name()
 
 const std::string& Plugin::version()
 {
-	static const std::string version(__DATE__ " " __TIME__);
+	static const std::string version("6.0");
 	return version;
 }
 

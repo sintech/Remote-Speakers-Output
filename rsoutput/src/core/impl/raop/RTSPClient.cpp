@@ -804,13 +804,9 @@ RTSPResponse RTSPClientImpl::sendRequestReceiveResponse(RTSPRequest& request)
 	buffer_t requestData;  std::string requestText;
 	request.build(requestData, requestText, requestURI);
 
-	// Log the method, not Authorization headers, stream keys or track metadata.
-	Debugger::printf("RTSP %s: sending request.", request.method().c_str());
 	sendRequest(requestData);
 
 	const std::string responseText(receiveResponse());
-	Debugger::printf("RTSP %s: %s", request.method().c_str(),
-		responseText.substr(0, responseText.find("\r\n")).c_str());
 
 	// increment sequence number after successful reception of response
 	_messageSequenceNumber += 1;

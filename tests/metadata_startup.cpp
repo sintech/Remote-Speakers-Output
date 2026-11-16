@@ -221,7 +221,7 @@ int main()
     buffer_t artwork;
     shorts_t playlist;
     auto read = [&](bool allow) {
-        return player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, allow);
+        return player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, allow, false);
     };
     if (read(false) != 0 || ipcCalls != 0) return 3;
     std::thread worker([&] { read(true); });
@@ -232,9 +232,9 @@ int main()
     if (read(true) != 42000 || !title.empty() || fileInfoCalls != 0) return 6;
     hasFile = true;
     if (read(true) != 42000 || title != "Startup test" || !ownedPathStayedValid) return 7;
-    if (serviceQueries != 0 || !artwork.empty()) return 8; // default-off must not touch Wasabi
+    if (serviceQueries != 0 || !artwork.empty()) return 8; // explicitly disabled artwork must not touch Wasabi
     wcscpy_s(borrowedPath, L"startup.mp3");
-    if (player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true, true) != 42000)
+    if (player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true) != 42000)
         return 9;
     if (artwork.size() != 4 || type != "image/jpeg" || foreignProvider.requests != 0 ||
         matchingProvider.requests != 1 || invalidArtworkCalls != 0 || globalLocks != 0 ||
@@ -242,17 +242,14 @@ int main()
         return 10;
     useFallback = true;
     wcscpy_s(borrowedPath, L"startup.mp3");
-    player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true, true);
+    player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true);
     if (unexpectedWriterQueries != 0 || type != "image/jpeg" || !verifyJPEG(artwork) ||
         invalidArtworkCalls != 0 || freedBuffers != 3 || albumFactory.releases != 1 ||
         globalLocks != 0 || managerReleases != 0) return 13;
     char folder[MAX_PATH], ini[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, folder) || !GetTempFileNameA(folder, "apx", 0, ini)) return 11;
-    WritePrivateProfileStringA("Remote Speakers output", "EnableArtwork", "1", ini);
     OptionsUtils::loadOptions(ini);
     OptionsUtils::saveOptions(ini);
-    const bool preserved = GetPrivateProfileIntA("Remote Speakers output", "EnableArtwork", 0, ini) == 1;
-    if (!preserved) return 12;
     const UINT defaultDelay = GetPrivateProfileIntA("Remote Speakers output", "SyncLatencyMs", 0, ini);
     if (defaultDelay < 100 || defaultDelay > 2000) return 14;
     for (const char* value : { "100", "750", "2000" }) {

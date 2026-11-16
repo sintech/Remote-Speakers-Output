@@ -14,14 +14,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-// Modified 2026-11-16: bounded file logging for playback diagnostics.
 #include "Debugger.h"
 #include "Platform.inl"
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
 #include <stdexcept>
-#include <mutex>
 #include <vector>
 #include <windows.h>
 #include <Poco/Debugger.h>
@@ -32,42 +30,12 @@ namespace UTF16 = Platform::Charset;
 
 static Debugger::PrintCallback _echo = NULL;
 
-// Keep diagnostics local. Serialize writes from discovery and playback threads.
-// Failures to write a log must never interrupt playback or load a debugger.
-static void appendFileLog(const std::string& message)
-{
-	try {
-		static std::mutex mutex;
-		std::lock_guard<std::mutex> lock(mutex);
-		wchar_t folder[MAX_PATH];
-		const DWORD length = GetTempPathW(MAX_PATH, folder);
-		if (length == 0 || length >= MAX_PATH) return;
-		const std::wstring path = std::wstring(folder, length) + L"out_apx.log";
-		FILE* file = NULL;
-		if (_wfopen_s(&file, path.c_str(), L"ab") != 0 || !file) return;
-		std::fseek(file, 0, SEEK_END);
-		if (std::ftell(file) > 2 * 1024 * 1024) {
-			std::fclose(file);
-			file = NULL;
-			if (_wfopen_s(&file, path.c_str(), L"wb") != 0 || !file) return;
-		}
-		SYSTEMTIME now;
-		GetLocalTime(&now);
-		std::fprintf(file, "%04u-%02u-%02u %02u:%02u:%02u.%03u [pid=%lu tid=%lu] ",
-			now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute,
-			now.wSecond, now.wMilliseconds, GetCurrentProcessId(), GetCurrentThreadId());
-		std::fwrite(message.data(), 1, message.size(), file);
-		std::fwrite("\r\n", 1, 2, file);
-		std::fclose(file);
-	} catch (...) {}
-}
-
 
 void Debugger::print(const std::string& msg)
 {
-	appendFileLog(msg);
 	if (_echo) try { _echo(msg.c_str()); } catch (...) {}
 
+#ifdef _DEBUG
 	try
 	{
 		if (Poco::Debugger::isAvailable())
@@ -85,11 +53,15 @@ void Debugger::print(const std::string& msg)
 	{
 		Poco::Debugger::enter(msg, __FILE__, __LINE__);
 	}
+#endif
 }
 
 
 void Debugger::printf(const char* const fmt, ...)
 {
+#ifndef _DEBUG
+	if (!_echo) return;
+#endif
 	try
 	{
 		va_list args;
@@ -116,6 +88,9 @@ void Debugger::printf(const char* const fmt, ...)
 
 void Debugger::printException(const std::exception& except, const std::string& scope)
 {
+#ifndef _DEBUG
+	if (!_echo) return;
+#endif
 	std::string message;
 
 	if (!scope.empty())
@@ -140,6 +115,9 @@ void Debugger::printException(const std::exception& except, const std::string& s
 
 void Debugger::printLastError(const std::string& scope, const char* const file, const int line)
 {
+#ifndef _DEBUG
+	if (!_echo) return;
+#endif
 	std::string message;
 
 	if (!scope.empty())

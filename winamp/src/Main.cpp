@@ -42,13 +42,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 	switch (reason)
 	{
 	case DLL_PROCESS_ATTACH:
-		Debugger::print("Player attaching to plug-in...");
 		assert(dllInstance == NULL);
 		dllInstance = instance;
 		break;
 
 	case DLL_PROCESS_DETACH:
-		Debugger::print("Player detaching from plug-in...");
 		assert(dllInstance != NULL);
 		dllInstance = NULL;
 		break;
@@ -67,7 +65,6 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
  */
 extern "C" __declspec(dllexport) Out_Module* winampGetOutModule()
 {
-	Debugger::print("Player requesting plug-in interface...");
 
 	// initialize output interface singleton
 	static const std::string name(Plugin::name() + " (" + Plugin::version() + ")");
