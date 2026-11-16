@@ -5,6 +5,105 @@
 #include <cstdio>
 #include <cwchar>
 #include <thread>
+#include <cstdlib>
+#include <cstring>
+#include <OptionsUtils.h>
+#include <wasabi/api_service.h>
+#include <wasabi/api_memmgr.h>
+#include <wasabi/svc_albumArtProvider.h>
+#include <wasabi/waservicefactory.h>
+
+static int invalidArtworkCalls = 0, globalLocks = 0, managerReleases = 0;
+static int serviceQueries = 0, freedBuffers = 0;
+
+class ArtProvider : public svc_albumArtProvider {
+public:
+    bool mine;
+    int requests = 0;
+    explicit ArtProvider(bool value) : mine(value) {}
+    int _dispatch(int msg, void* result, void** args, int) override {
+        if (msg == SVC_ALBUMARTPROVIDER_ISMINE) {
+            *static_cast<bool*>(result) = mine;
+            return 1;
+        }
+        if (msg == SVC_ALBUMARTPROVIDER_GETALBUMARTDATA) {
+            ++requests;
+            if (!mine) { ++invalidArtworkCalls; *static_cast<int*>(result) = ALBUMARTPROVIDER_FAILURE; return 1; }
+            void* bytes = std::malloc(4);
+            std::memcpy(bytes, "JPEG", 4);
+            wchar_t* mime = static_cast<wchar_t*>(std::malloc(sizeof(L"jpeg")));
+            std::memcpy(mime, L"jpeg", sizeof(L"jpeg"));
+            **reinterpret_cast<void***>(args[2]) = bytes;
+            **reinterpret_cast<size_t**>(args[3]) = 4;
+            **reinterpret_cast<wchar_t***>(args[4]) = mime;
+            *static_cast<int*>(result) = ALBUMARTPROVIDER_SUCCESS;
+            return 1;
+        }
+        return 0;
+    }
+};
+
+class MemoryManager : public api_memmgr {
+public:
+    int _dispatch(int msg, void*, void** args, int) override {
+        if (msg != API_MEMMGR_SYSFREE) return 0;
+        std::free(*static_cast<void**>(args[0]));
+        ++freedBuffers;
+        return 1;
+    }
+};
+
+class Factory : public waServiceFactory {
+public:
+    Dispatchable* value;
+    int releases = 0;
+    explicit Factory(Dispatchable* item) : value(item) {}
+    int _dispatch(int msg, void* result, void** args, int) override {
+        if (msg == WASERVICEFACTORY_GETINTERFACE) {
+            if (*static_cast<int*>(args[0])) ++globalLocks;
+            *static_cast<void**>(result) = value;
+            return 1;
+        }
+        if (msg == WASERVICEFACTORY_RELEASEINTERFACE) {
+            if (*static_cast<void**>(args[0]) != value) ++invalidArtworkCalls;
+            ++releases;
+            *static_cast<int*>(result) = 1;
+            return 1;
+        }
+        return 0;
+    }
+};
+
+static ArtProvider foreignProvider(false), matchingProvider(true);
+static MemoryManager memoryManager;
+static Factory foreignFactory(&foreignProvider), matchingFactory(&matchingProvider), memoryFactory(&memoryManager);
+
+class Services : public api_service {
+public:
+    int _dispatch(int msg, void* result, void** args, int) override {
+        if (msg == API_SERVICE_SERVICE_GETSERVICEBYGUID) {
+            *static_cast<waServiceFactory**>(result) =
+                IsEqualGUID(*static_cast<GUID*>(args[0]), memMgrApiServiceGuid) ? &memoryFactory : NULL;
+            return 1;
+        }
+        if (msg == API_SERVICE_SERVICE_GETNUMSERVICES) {
+            *static_cast<int*>(result) = 2;
+            return 1;
+        }
+        if (msg == API_SERVICE_SERVICE_ENUMSERVICE) {
+            *static_cast<waServiceFactory**>(result) =
+                *static_cast<size_t*>(args[1]) == 0 ? &foreignFactory : &matchingFactory;
+            return 1;
+        }
+        if (msg == API_SERVICE_SERVICE_RELEASE) {
+            ++managerReleases; // factory pointers must never be passed here
+            *static_cast<int*>(result) = 0;
+            return 1;
+        }
+        return 0;
+    }
+};
+static Services services;
 
 static int state = 0;
 static int ipcCalls = 0;
@@ -21,7 +120,7 @@ static LRESULT CALLBACK hostProc(HWND window, UINT message, WPARAM wp, LPARAM lp
     case IPC_ISPLAYING: return state;
     case IPC_GET_PLAYING_FILENAME: return hasFile ? reinterpret_cast<LRESULT>(borrowedPath) : 1;
     case IPC_GET_PLAYING_TITLE: return 1; // unsupported/not-yet-ready pointer sentinel
-    case IPC_GET_API_SERVICE: return 1;
+    case IPC_GET_API_SERVICE: ++serviceQueries; return reinterpret_cast<LRESULT>(&services);
     case IPC_GETOUTPUTTIME: return 42000;
     case IPC_GETLISTLENGTH: return 0;
     case IPC_GET_BASIC_FILE_INFOW: {
@@ -70,7 +169,23 @@ int main()
     if (read(true) != 42000 || !title.empty() || fileInfoCalls != 0) return 6;
     hasFile = true;
     if (read(true) != 42000 || title != "Startup test" || !ownedPathStayedValid) return 7;
+    if (serviceQueries != 0 || !artwork.empty()) return 8; // default-off must not touch Wasabi
+    wcscpy_s(borrowedPath, L"startup.mp3");
+    if (player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true, true) != 42000)
+        return 9;
+    if (artwork.size() != 4 || type != "image/jpeg" || foreignProvider.requests != 0 ||
+        matchingProvider.requests != 1 || invalidArtworkCalls != 0 || globalLocks != 0 ||
+        managerReleases != 0 || foreignFactory.releases != 1 || matchingFactory.releases != 1 || freedBuffers != 2)
+        return 10;
+    char folder[MAX_PATH], ini[MAX_PATH];
+    if (!GetTempPathA(MAX_PATH, folder) || !GetTempFileNameA(folder, "apx", 0, ini)) return 11;
+    WritePrivateProfileStringA("Remote Speakers output", "EnableArtwork", "1", ini);
+    OptionsUtils::loadOptions(ini);
+    OptionsUtils::saveOptions(ini);
+    const bool preserved = GetPrivateProfileIntA("Remote Speakers output", "EnableArtwork", 0, ini) == 1;
+    DeleteFileA(ini);
+    if (!preserved) return 12;
     DestroyWindow(window);
-    std::puts("Startup deferral, UI-thread gating, IPC sentinels and owned filename passed.");
+    std::puts("Startup, IPC ownership, artwork defaults/provider ownership and settings preservation passed.");
     return 0;
 }

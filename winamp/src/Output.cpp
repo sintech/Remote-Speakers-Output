@@ -503,7 +503,8 @@ void Output::refreshMetadata()
 		std::string artworkType;
 		shorts_t    playlistPos;
 		const time_t length = player->getPlaybackMetadata(
-			title, album, artist, artworkData, artworkType, playlistPos);
+			title, album, artist, artworkData, artworkType, playlistPos, true,
+			GetPrivateProfileIntA(Plugin::name().c_str(), "EnableArtwork", 0, _iniFilePath.c_str()) != 0);
 		const time_t offset = player->getPlaybackPosition();
 
 		Debugger::printf(

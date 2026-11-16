@@ -437,6 +437,9 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 {
 	Debugger::printf("Writing plug-in options to '%s'...", iniFilePath.c_str());
 
+	const bool enableArtwork = GetPrivateProfileIntA(Plugin::name().c_str(),
+		"EnableArtwork", 0, iniFilePath.c_str()) != 0;
+
 	// clear existing options in file
 	if (!WritePrivateProfileSectionA(Plugin::name().c_str(), "", iniFilePath.c_str()))
 	{
@@ -445,6 +448,9 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 	}
 
 	const Options::SharedPtr options = Options::getOptions();
+
+	WritePrivateProfileStringA(Plugin::name().c_str(), "EnableArtwork",
+		enableArtwork ? "1" : "0", iniFilePath.c_str());
 
 	// write volume control flag
 	WritePrivateProfileStringA(Plugin::name().c_str(), "VolumeControl",

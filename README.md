@@ -72,6 +72,13 @@ queue latency reported to Winamp is not a measured delay at the speaker.
 
 ## Playback diagnostics
 
+Album artwork retrieval from Winamp is **disabled by default** after a startup
+crash was traced to this path on a real host. Audio and text metadata remain
+enabled. Advanced testing can opt in with `EnableArtwork=1` in the
+`[Remote Speakers output]` section of Winamp.ini while Winamp is closed.
+The option is preserved when the plugin saves its settings. Keep the default
+until artwork has been verified on the target Winamp version.
+
 This build writes a bounded (2 MiB) UTF-8 log to `%TEMP%\out_apx.log`.
 Close Winamp, delete an old log if present, start Winamp and try playback once.
 The log records initialization stages, receiver connection, RTSP method/status

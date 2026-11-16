@@ -121,33 +121,38 @@ static void GetVisualFileInfo(buffer_t& imageData, std::string& imageType,
 		if (aapServiceFactory != NULL)
 		{
 			svc_albumArtProvider* const aapService =
-				(svc_albumArtProvider*) aapServiceFactory->getInterface();
+				(svc_albumArtProvider*) aapServiceFactory->getInterface(FALSE);
 			if (aapService != NULL)
 			{
-				void*     data = 0;
-				size_t    size = 0;
-				wchar_t*  type = 0;
-				const int code = aapService->GetAlbumArtData(
-					filePath, infoType, &data, &size, &type);
-				if (code == ALBUMARTPROVIDER_SUCCESS && data != 0)
+				const bool matches = aapService->IsMine(filePath);
+				Debugger::printf("Artwork: provider %u matches=%i.", (unsigned int) i, (int) matches);
+				if (matches)
 				{
-					if (size != 0 && type != 0)
+					void*     data = 0;
+					size_t    size = 0;
+					wchar_t*  type = 0;
+					const int code = aapService->GetAlbumArtData(
+						filePath, infoType, &data, &size, &type);
+					if (code == ALBUMARTPROVIDER_SUCCESS && data != 0)
 					{
-						imageData.resize(size);
-						std::memcpy(&imageData[0], data, size);
-						imageType = "image/" + ToUTF8(type);
+						if (size != 0 && type != 0)
+						{
+							imageData.resize(size);
+							std::memcpy(&imageData[0], data, size);
+							imageType = "image/" + ToUTF8(type);
 
-						i = n; // break out of loop after cleanup
+							i = n; // break out of loop after cleanup
+						}
+
+						if (data) memMgmtService->sysFree(data);
+						if (type) memMgmtService->sysFree(type);
 					}
 
-					if (data) memMgmtService->sysFree(data);
-					if (type) memMgmtService->sysFree(type);
 				}
 
 				aapServiceFactory->releaseInterface(aapService);
 			}
 
-			apiService->service_release(aapServiceFactory);
 		}
 	}
 }
@@ -162,7 +167,7 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 	if (aaServiceFactory != NULL)
 	{
 		api_albumart* const aaService =
-			(api_albumart*) aaServiceFactory->getInterface();
+			(api_albumart*) aaServiceFactory->getInterface(FALSE);
 		if (aaService != NULL)
 		{
 			int       wdth = 0;
@@ -184,7 +189,6 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 			aaServiceFactory->releaseInterface(aaService);
 		}
 
-		apiService->service_release(aaServiceFactory);
 	}
 }
 
@@ -203,7 +207,7 @@ static buffer_t ToJPEG(ARGB32* const data, const int wdth, const int hght,
 		if (imgServiceFactory != NULL)
 		{
 			svc_imageWriter* const imgService =
-				(svc_imageWriter*) imgServiceFactory->getInterface();
+				(svc_imageWriter*) imgServiceFactory->getInterface(FALSE);
 			if (imgService != NULL)
 			{
 				if (imgService->bitDepthSupported(32)
@@ -224,7 +228,6 @@ static buffer_t ToJPEG(ARGB32* const data, const int wdth, const int hght,
 				imgServiceFactory->releaseInterface(imgService);
 			}
 
-			apiService->service_release(imgServiceFactory);
 		}
 	}
 
@@ -540,7 +543,7 @@ void WinampPlayer::toggleShuffle()
 
 time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
 	std::string& artist, buffer_t& artworkData, std::string& artworkType, shorts_t& listpos,
-	const bool allowFileMetadata) const
+	const bool allowFileMetadata, const bool allowArtwork) const
 {
 	time_t length = 0; listpos = shorts_t(0,0);
 	title.clear(), album.clear(), artist.clear();
@@ -568,25 +571,29 @@ time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
 		GetTextualFileInfo(album, L"Album", filePath, window());
 		GetTextualFileInfo(artist, L"Artist", filePath, window());
 
-		if (_apiService == NULL)
+		if (allowArtwork)
 		{
-			Debugger::print("Metadata: acquiring Winamp services.");
-			// try to initialize player service interfaces
-			const_cast<WinampPlayer*>(this)->initServices();
-		}
-		if (_apiService != NULL && _memMgmtService != NULL)
-		{
-			Debugger::print("Metadata: querying album artwork.");
-			GetVisualFileInfo(artworkData, artworkType, L"cover",
-							filePath, _apiService, _memMgmtService);
-
-			if (artworkData.empty())
+			if (_apiService == NULL)
 			{
-				// try an alternate API for getting artwork
-				GetVisualFileInfo2(artworkData, artworkType, L"cover",
+				Debugger::print("Metadata: acquiring Winamp services.");
+				// try to initialize player service interfaces
+				const_cast<WinampPlayer*>(this)->initServices();
+			}
+			if (_apiService != NULL && _memMgmtService != NULL)
+			{
+				Debugger::print("Metadata: querying album artwork.");
+				GetVisualFileInfo(artworkData, artworkType, L"cover",
 								filePath, _apiService, _memMgmtService);
+
+				if (artworkData.empty())
+				{
+					// try an alternate API for getting artwork
+					GetVisualFileInfo2(artworkData, artworkType, L"cover",
+									filePath, _apiService, _memMgmtService);
+				}
 			}
 		}
+		else Debugger::print("Metadata: album artwork disabled (EnableArtwork=0).");
 	}
 
 	if (length == 0)
@@ -800,7 +807,6 @@ void WinampPlayer::freeServices()
 				_memMgmtService = NULL;
 			}
 
-			_apiService->service_release(_memMgmtServiceFactory);
 			_memMgmtServiceFactory = NULL;
 		}
 
@@ -826,7 +832,7 @@ void WinampPlayer::initServices()
 			return;
 		}
 
-		_memMgmtService = static_cast<api_memmgr*>(_memMgmtServiceFactory->getInterface());
+		_memMgmtService = static_cast<api_memmgr*>(_memMgmtServiceFactory->getInterface(FALSE));
 		if (_memMgmtService == NULL)
 		{
 			freeServices();

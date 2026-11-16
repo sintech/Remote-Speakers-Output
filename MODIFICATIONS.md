@@ -1,5 +1,14 @@
 # Changes from upstream 5.6
 
+Artwork provider safety, 2026-11-16:
+
+- Disable artwork retrieval by default (`EnableArtwork=0`) following a host crash
+  in the artwork path. Keep audio and text metadata enabled; preserve opt-in
+  `EnableArtwork=1` across settings saves.
+- Check each raw artwork provider's IsMine before calling GetAlbumArtData.
+- Acquire Wasabi interfaces without a global lock and release them through their
+  owning factory. Do not pass factory pointers to api_service::service_release.
+
 Winamp file-association startup safety, 2026-11-16:
 
 - Do not query file tags/artwork synchronously from the output Open callback,
