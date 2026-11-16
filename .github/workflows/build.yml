@@ -1,0 +1,65 @@
+name: Build Winamp plugin (x86)
+on:
+  workflow_dispatch:
+  push:
+    branches: ['build/github-actions']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  winamp:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize MSVC x86 environment
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio 2022 not found' }
+          $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+          cmd /c "`"$devcmd`" -arch=x86 -host_arch=x64 >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+              "$($matches[1])=$($matches[2])" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+          cl.exe 2>&1 | ForEach-Object { Write-Host $_ }
+          exit 0
+      - name: Cache dependency builds
+        uses: actions/cache@v4
+        with:
+          path: .deps
+          key: deps-windows2022-x86-v1-${{ hashFiles('scripts/dependencies.json', 'scripts/build.ps1') }}
+      - name: Build and check DLL loading
+        shell: pwsh
+        run: ./scripts/build.ps1
+      - name: Package matching source and dependency archives
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force source-package/dependency-archives | Out-Null
+          git archive --format=zip --output=source-package/project-source.zip HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'git archive failed' }
+          Copy-Item .deps/downloads/* source-package/dependency-archives/
+          Copy-Item scripts/dependencies.json source-package/
+          @'
+          Extract project-source.zip. Copy dependency-archives/* into .deps/downloads/ inside the extracted project.
+          Follow README.md to build with MSVC 2022 x86. All dependency downloads are SHA-256 verified.
+          The exact project source commit is recorded in COMMIT.txt.
+          '@ | Set-Content source-package/BUILD.txt
+          git rev-parse HEAD | Set-Content source-package/COMMIT.txt
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: Remote-Speakers-Output-x86
+          path: dist/
+          if-no-files-found: error
+      - name: Upload corresponding source
+        uses: actions/upload-artifact@v4
+        with:
+          name: Remote-Speakers-Output-source
+          path: source-package/
+          if-no-files-found: error

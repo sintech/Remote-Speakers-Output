@@ -1,0 +1,7 @@
+.deps/
+build/
+dist/
+source-package/
+*.user
+**/obj/
+**/out/

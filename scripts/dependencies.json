@@ -1,0 +1,28 @@
+[
+  {
+    "name": "openssl",
+    "url": "https://codeload.github.com/openssl/openssl/tar.gz/refs/tags/openssl-3.5.0",
+    "sha256": "576740bfe93209efda2be7cecb00dfeabe77fe9c5c908c1790cbe8fa50b223d0"
+  },
+  {
+    "name": "poco",
+    "url": "https://codeload.github.com/pocoproject/poco/tar.gz/refs/tags/poco-1.9.4-release",
+    "sha256": "367014cdbcfe9df8f1d746239902149d2398af9b49ba2c1aaaa88616fd538f61"
+  },
+  {
+    "name": "samplerate",
+    "url": "https://codeload.github.com/libsndfile/libsamplerate/tar.gz/refs/tags/0.1.9",
+    "sha256": "5c461949a01f71d7d884cc83690c0dd7d7cc83d2dd10208c96990ff91d03abdf"
+  },
+  {
+    "name": "alac",
+    "url": "https://codeload.github.com/macosforge/alac/tar.gz/c38887c5c5e64a4b31108733bd79ca9b2496d987",
+    "sha256": "98635ece42fb1c3fceb75eaa4b5164d866e09f0195b3e7ec4085f1123c5e272f"
+  },
+  {
+    "name": "bonjour",
+    "url": "https://raw.githubusercontent.com/apple-oss-distributions/mDNSResponder/d4658af3f5f291311c6aee4210aa6d39bda82bbe/mDNSShared/dns_sd.h",
+    "sha256": "5d0ca50f207f6eb02e09d743f9b65d2ade65e8f81862dcd3703845b4fe87a9c1",
+    "filename": "dns_sd.h"
+  }
+]
