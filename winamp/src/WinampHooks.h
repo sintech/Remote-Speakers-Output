@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -54,7 +55,7 @@ private:
 	UINT8 _itemCount;
 
 	DeviceUtils _devices;
-	std::vector<const std::string> _names;
+	std::vector<std::string> _names;
 };
 
 
