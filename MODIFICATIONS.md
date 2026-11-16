@@ -6,6 +6,10 @@ Playback diagnostics, 2026-11-16:
 - Logged the Winamp initialization/open stages and RAOP setup stages.
 - Replaced raw RTSP request/response dumps with method/status summaries so the
   diagnostic file omits authentication headers, stream keys and metadata bodies.
+- Added a hardware-independent session startup regression test. It reproduced a
+  failure caused by Poco 1.9's lazy default UDP socket creation. The RAOP engine
+  now explicitly creates IPv4 sockets before setting socket options, and uses
+  `WSAIoctl` for `SIO_UDP_CONNRESET` instead of `ioctlsocket`.
 
 2026-11-16:
 

@@ -4,6 +4,7 @@
 #include "RAOPEngine.h"
 #include "NTPTimestamp.h"
 #include <Poco/Net/Net.h>
+#include <Poco/Exception.h>
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
@@ -34,6 +35,10 @@ int main()
         if (difference < -1 || difference > 1)
             throw std::runtime_error("NTP timestamp round trip failed");
         std::puts("RAOP crypto, ALAC initialization, UDP sockets and NTP conversion passed.");
+    } catch (const Poco::Exception& error) {
+        std::fprintf(stderr, "Core session startup failed: %s (code %d)\n",
+            error.displayText().c_str(), error.code());
+        result = 1;
     } catch (const std::exception& error) {
         std::fprintf(stderr, "Core session startup failed: %s\n", error.what());
         result = 1;

@@ -176,6 +176,19 @@ static void sendTo(DatagramSocket& socket, const SocketAddress& address,
 	}
 }
 
+static void disableUdpConnectionReset(DatagramSocket& socket)
+{
+	BOOL enabled = FALSE;
+	DWORD returned = 0;
+	// SIO_UDP_CONNRESET requires WSAIoctl rather than ioctlsocket.
+	if (WSAIoctl(socket.impl()->sockfd(), SIO_UDP_CONNRESET,
+		&enabled, sizeof(enabled), NULL, 0, &returned, NULL, NULL) == SOCKET_ERROR)
+	{
+		throw std::runtime_error("WSAIoctl(SIO_UDP_CONNRESET) failed: " +
+			std::to_string(WSAGetLastError()));
+	}
+}
+
 
 //------------------------------------------------------------------------------
 
@@ -214,6 +227,9 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	_outputObserver(outputObserver),
 	_rtpDataSecured(RAOP_PACKET_MAX_SIZE, PACKET_BUFFER_COUNT, PACKET_MEMORY_COUNT),
 	_rtpDataUnsecured(RAOP_PACKET_MAX_SIZE, PACKET_BUFFER_COUNT, PACKET_MEMORY_COUNT),
+	_controlSocket(SocketAddress::IPv4),
+	_timingSocket(SocketAddress::IPv4),
+	_dataSocket(SocketAddress::IPv4),
 	_controlRequestHandler(*this, &RAOPEngine::handleControlRequest),
 	_timingRequestHandler(*this, &RAOPEngine::handleTimingRequest),
 	_reactorThread("RAOPEngine.SocketReactor::run"),
@@ -283,15 +299,15 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	// Ownership of both BIGNUMs has transferred to RSA.
 
 	// reduce time to send by disabling blocking
+	Debugger::print("RAOP engine: RSA public key ready; configuring UDP sockets.");
 	_controlSocket.setBlocking(false);
 	_timingSocket.setBlocking(false);
 	_dataSocket.setBlocking(false);
 
 	// disable ICMP Port Unreachable error processing
-	BOOL flg = FALSE;
-	_controlSocket.impl()->ioctl(SIO_UDP_CONNRESET, &flg);
-	_timingSocket.impl()->ioctl(SIO_UDP_CONNRESET, &flg);
-	_dataSocket.impl()->ioctl(SIO_UDP_CONNRESET, &flg);
+	disableUdpConnectionReset(_controlSocket);
+	disableUdpConnectionReset(_timingSocket);
+	disableUdpConnectionReset(_dataSocket);
 
 	// reduce packet loss by increasing send buffer sizes
 	_controlSocket.setSendBufferSize(2 *_controlSocket.getSendBufferSize());
@@ -303,6 +319,7 @@ RAOPEngine::RAOPEngine(OutputObserver& outputObserver)
 	_socketReactor.addEventHandler(_controlSocket, _controlRequestHandler);
 	_socketReactor.addEventHandler(_timingSocket, _timingRequestHandler);
 	_reactorThread.start(_socketReactor);
+	Debugger::print("RAOP engine: UDP sockets and reactor ready.");
 }
 
 
