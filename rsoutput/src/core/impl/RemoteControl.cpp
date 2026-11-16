@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -70,8 +71,8 @@ enum Command
 struct Request
 {
 	Command command;
-	std::map<const std::string,const std::string> params;
-	std::map<const std::string,const std::string> headers;
+	std::map<std::string,std::string> params;
+	std::map<std::string,std::string> headers;
 };
 
 

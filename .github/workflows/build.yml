@@ -40,7 +40,10 @@ jobs:
           path: |
             .deps/install
             .deps/downloads
-          key: deps-windows2022-x86-v2-${{ env.VCToolsVersion }}-${{ hashFiles('scripts/dependencies.json', 'scripts/build.ps1') }}
+          # Bump v2 when changing dependency compiler options or bootstrap patches.
+          key: deps-windows2022-x86-v2-${{ env.VCToolsVersion }}-${{ hashFiles('scripts/dependencies.json') }}
+          restore-keys: |
+            deps-windows2022-x86-v2-${{ env.VCToolsVersion }}-
       - name: Build dependencies
         shell: pwsh
         run: ./scripts/build.ps1 -DependenciesOnly

@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -69,7 +70,7 @@ private:
 private:
 	OutputSink::SharedPtr _deviceOutputSink;
 
-	typedef std::map<const std::string,Device::SharedPtr> DeviceMap;
+	typedef std::map<std::string,Device::SharedPtr> DeviceMap;
 	DeviceMap _devices; // must be declared after device output sink
 
 	typedef Poco::Observer<DeviceManager,DeviceNotification> DeviceObserver;

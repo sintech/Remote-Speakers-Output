@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -58,8 +59,8 @@ class DeviceDiscoveryImpl
 
 	struct ServiceInfo { std::string name; std::string type; };
 	std::map<DNSServiceRef,const ServiceInfo> _services;
-	std::map<const std::string,const DeviceInfo> _devices;
-	std::map<const std::string,const std::string> _secrets;
+	std::map<std::string,DeviceInfo> _devices;
+	std::map<std::string,std::string> _secrets;
 	DNSServiceRef _discovery;
 	Poco::FastMutex _mutex;
 
@@ -115,7 +116,7 @@ void DeviceDiscoveryImpl::addListener(DeviceDiscovery::Listener& listener)
 	_listeners.insert(&listener);
 
 	// inform listener of all known devices
-	for (std::map<const std::string,const DeviceInfo>::const_iterator it =
+	for (std::map<std::string,DeviceInfo>::const_iterator it =
 		_devices.begin(); it != _devices.end(); ++it)
 	{
 		listener.onDeviceFound(it->second);
@@ -169,7 +170,7 @@ void DeviceDiscoveryImpl::onServiceLost(
 	_secrets.erase(part_one_of(name));
 
 	// retrieve device info from map
-	std::map<const std::string,const DeviceInfo>::const_iterator pos =
+	std::map<std::string,DeviceInfo>::const_iterator pos =
 		_devices.find(part_two_of(name));
 	if (pos != _devices.end())
 	{

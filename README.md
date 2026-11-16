@@ -6,8 +6,10 @@ Original source archive: `out_apx-src-5.6.zip`, SHA-256
 
 ## Build on GitHub
 
-Open **Actions → Build Winamp plugin (x86) → Run workflow** and select this branch.
-Pushes to `build/github-actions` and pull requests also trigger a build.
+Push a commit to `build/github-actions` to trigger the workflow, then open
+**Actions → Build Winamp plugin (x86)**. Pull requests also trigger a build.
+After the workflow exists on the repository's default branch, GitHub additionally
+provides **Run workflow** for manual runs with a branch selection.
 Download **Remote-Speakers-Output-x86** from a successful run's Artifacts section.
 The **Remote-Speakers-Output-source** artifact includes the matching project source
 and the original dependency archives used for that build.
@@ -20,8 +22,10 @@ by this source build. Old Visual Studio project files are kept for reference.
 ## Install and check
 
 1. Close Winamp and back up the installed plugin DLLs.
-2. Extract **both** `out_apx.dll` and `apxCore.dll` into Winamp's `Plugins` directory.
-   Remove conflicting copies from older installations/DLL search paths if needed.
+2. Extract the binary artifact into Winamp's installation directory, preserving
+   folders: `apxCore.dll` goes next to `winamp.exe`, and `Plugins/out_apx.dll`
+   goes into `Plugins`. The core belongs next to the executable so Windows can
+   find it without modifying the system DLL search path.
 3. Start 32-bit Winamp, open **Preferences → Plug-ins → Output** and select
    **Remote Speakers output**. Configure the receiver and test playback.
 

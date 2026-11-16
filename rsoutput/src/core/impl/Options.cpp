@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -212,7 +213,7 @@ const std::string& Options::getPassword(const std::string& deviceName) const
 {
 	static const std::string emptyPassword;
 
-	std::map<const std::string,const std::pair<const std::string,bool>>::const_iterator pos =
+	std::map<std::string,std::pair<std::string,bool>>::const_iterator pos =
 		_devicePasswords.find(deviceName);
 	return (pos != _devicePasswords.end() ? pos->second.first : emptyPassword);
 }
@@ -220,7 +221,7 @@ const std::string& Options::getPassword(const std::string& deviceName) const
 
 bool Options::getRememberPassword(const std::string& deviceName) const
 {
-	std::map<const std::string,const std::pair<const std::string,bool>>::const_iterator pos =
+	std::map<std::string,std::pair<std::string,bool>>::const_iterator pos =
 		_devicePasswords.find(deviceName);
 	return (pos != _devicePasswords.end() ? pos->second.second : false);
 }

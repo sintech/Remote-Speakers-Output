@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -65,8 +66,8 @@ private:
 	bool _resetOnPause;
 
 	DeviceInfoSet _devices;
-	std::set<const std::string> _activatedDevices;
-	std::map<const std::string,const std::pair<const std::string,bool>> _devicePasswords;
+	std::set<std::string> _activatedDevices;
+	std::map<std::string,std::pair<std::string,bool>> _devicePasswords;
 
 	friend bool operator ==(const Options&, const Options&);
 };

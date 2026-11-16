@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -33,7 +34,7 @@ public:
 		std::string display_name;
 		bool activated; bool available;
 	};
-	typedef std::vector<const Info> InfoList;
+	typedef std::vector<Info> InfoList;
 	typedef std::shared_ptr<InfoList> InfoListPtr;
 
 public:

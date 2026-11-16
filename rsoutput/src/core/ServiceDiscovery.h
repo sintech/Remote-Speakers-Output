@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -31,7 +32,7 @@ public:
 		friend class ServiceDiscoveryImpl;
 
 	public:
-		const TXTRecord(const void* buf, uint16_t len);
+		TXTRecord(const void* buf, uint16_t len);
 		TXTRecord();
 		~TXTRecord();
 

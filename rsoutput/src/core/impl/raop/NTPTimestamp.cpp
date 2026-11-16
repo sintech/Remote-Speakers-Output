@@ -1,3 +1,4 @@
+// Modified 2026-11-16 for the MSVC 2022 build; see MODIFICATIONS.md.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -25,7 +26,7 @@ using Poco::Timestamp;
 
 static const int64_t MICROSECONDS_PER_SECOND = 1000000;
 static const int64_t SECONDS_FROM_1900_TO_1970 = 0x83AA7E80;
-static const int64_t UINT32_MAX = std::numeric_limits<uint32_t>::max();
+static const int64_t MAX_NTP_WORD = std::numeric_limits<uint32_t>::max();
 
 
 NTPTimestamp& NTPTimestamp::operator =(const Timestamp& timestamp)
@@ -36,13 +37,13 @@ NTPTimestamp& NTPTimestamp::operator =(const Timestamp& timestamp)
 	int64_t seconds = microseconds / MICROSECONDS_PER_SECOND;
 	// NTP epoch is Jan 1, 1900; Timestamp epoch is Jan 1, 1970
 	seconds += SECONDS_FROM_1900_TO_1970;
-	assert(seconds <= UINT32_MAX);
+	assert(seconds <= MAX_NTP_WORD);
 
 	// calculate NTP timestamp fractional seconds
 	microseconds %= MICROSECONDS_PER_SECOND;
 	int64_t fractionalSeconds =
-		(microseconds * (UINT32_MAX + 1)) / MICROSECONDS_PER_SECOND;
-	assert(fractionalSeconds <= UINT32_MAX);
+		(microseconds * (MAX_NTP_WORD + 1)) / MICROSECONDS_PER_SECOND;
+	assert(fractionalSeconds <= MAX_NTP_WORD);
 
 	this->seconds = static_cast<uint32_t>(seconds);
 	this->fractionalSeconds = static_cast<uint32_t>(fractionalSeconds);
@@ -57,7 +58,7 @@ NTPTimestamp::operator Timestamp() const
 	const int64_t seconds = this->seconds - SECONDS_FROM_1900_TO_1970;
 
 	int64_t microseconds = seconds * MICROSECONDS_PER_SECOND;
-	microseconds += (fractionalSeconds * MICROSECONDS_PER_SECOND) / (UINT32_MAX + 1);
+	microseconds += (fractionalSeconds * MICROSECONDS_PER_SECOND) / (MAX_NTP_WORD + 1);
 
 	return Timestamp(microseconds);
 }

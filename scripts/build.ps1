@@ -84,7 +84,8 @@ Copy-Item "$deps/poco/LICENSE" 'dist/licenses/Poco.txt'
 Copy-Item "$deps/samplerate/COPYING" 'dist/licenses/libsamplerate.txt'
 Copy-Item "$deps/alac/codec/APPLE_LICENSE.txt" 'dist/licenses/ALAC.txt'
 Copy-Item "$deps/bonjour/dns_sd.h" 'dist/licenses/Bonjour-header.h'
-Get-ChildItem 'dist/*.dll' | ForEach-Object {
+Get-ChildItem 'dist' -Filter '*.dll' -Recurse | ForEach-Object {
     $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $($_.Name)"
+    $relative = [IO.Path]::GetRelativePath((Join-Path $root 'dist'), $_.FullName).Replace('\', '/')
+    "$hash  $relative"
 } | Set-Content 'dist/SHA256SUMS.txt'
