@@ -9,12 +9,17 @@
 #include <cstring>
 #include <OptionsUtils.h>
 #include <wasabi/api_service.h>
+#include <wasabi/api_albumart.h>
+#include <wasabi/svc_imgwrite.h>
 #include <wasabi/api_memmgr.h>
 #include <wasabi/svc_albumArtProvider.h>
 #include <wasabi/waservicefactory.h>
 
 static int invalidArtworkCalls = 0, globalLocks = 0, managerReleases = 0;
 static int serviceQueries = 0, freedBuffers = 0;
+static bool useFallback = false;
+static ARGB32* fallbackPixels = NULL;
+static int conversions = 0;
 
 class ArtProvider : public svc_albumArtProvider {
 public:
@@ -28,6 +33,7 @@ public:
         }
         if (msg == SVC_ALBUMARTPROVIDER_GETALBUMARTDATA) {
             ++requests;
+            if (useFallback) { *static_cast<int*>(result) = ALBUMARTPROVIDER_FAILURE; return 1; }
             if (!mine) { ++invalidArtworkCalls; *static_cast<int*>(result) = ALBUMARTPROVIDER_FAILURE; return 1; }
             void* bytes = std::malloc(4);
             std::memcpy(bytes, "JPEG", 4);
@@ -74,6 +80,42 @@ public:
     }
 };
 
+class AlbumArt : public api_albumart {
+public:
+    int _dispatch(int msg, void* result, void** args, int) override {
+        if (msg != API_ALBUMART_GETALBUMART) return 0;
+        **static_cast<int**>(args[2]) = 2;
+        **static_cast<int**>(args[3]) = 2;
+        fallbackPixels = static_cast<ARGB32*>(std::malloc(4 * sizeof(ARGB32)));
+        for (int i = 0; i < 4; ++i) fallbackPixels[i] = 0xFF123456;
+        **static_cast<ARGB32***>(args[4]) = fallbackPixels;
+        *static_cast<int*>(result) = ALBUMART_SUCCESS;
+        return 1;
+    }
+};
+class JpegWriter : public svc_imageWriter {
+public:
+    int _dispatch(int msg, void* result, void** args, int) override {
+        if (msg == BITDEPTHSUPPORTED) { *static_cast<int*>(result) = 1; return 1; }
+        if (msg == GETIMAGETYPENAME) { *static_cast<const wchar_t**>(result) = L"JPEG"; return 1; }
+        if (msg != CONVERT) return 0;
+        ++conversions;
+        const void* pixels = *static_cast<const void**>(args[0]);
+        if (pixels != fallbackPixels || *static_cast<int*>(args[1]) != 32 ||
+            *static_cast<int*>(args[2]) != 2 || *static_cast<int*>(args[3]) != 2 ||
+            static_cast<const ARGB32*>(pixels)[3] != 0xFF123456)
+            ++invalidArtworkCalls;
+        void* bytes = std::malloc(4);
+        std::memcpy(bytes, "JPEG", 4);
+        **static_cast<int**>(args[4]) = 4;
+        *static_cast<void**>(result) = bytes;
+        return 1;
+    }
+};
+static AlbumArt albumArt;
+static JpegWriter jpegWriter;
+static Factory albumFactory(&albumArt), jpegFactory(&jpegWriter);
+
 static ArtProvider foreignProvider(false), matchingProvider(true);
 static MemoryManager memoryManager;
 static Factory foreignFactory(&foreignProvider), matchingFactory(&matchingProvider), memoryFactory(&memoryManager);
@@ -83,15 +125,17 @@ public:
     int _dispatch(int msg, void* result, void** args, int) override {
         if (msg == API_SERVICE_SERVICE_GETSERVICEBYGUID) {
             *static_cast<waServiceFactory**>(result) =
-                IsEqualGUID(*static_cast<GUID*>(args[0]), memMgrApiServiceGuid) ? &memoryFactory : NULL;
+                IsEqualGUID(*static_cast<GUID*>(args[0]), memMgrApiServiceGuid) ? &memoryFactory :
+                IsEqualGUID(*static_cast<GUID*>(args[0]), albumArtGUID) ? &albumFactory : NULL;
             return 1;
         }
         if (msg == API_SERVICE_SERVICE_GETNUMSERVICES) {
-            *static_cast<int*>(result) = 2;
+            *static_cast<int*>(result) = *static_cast<FOURCC*>(args[0]) == svc_imageWriter::getServiceType() ? 1 : 2;
             return 1;
         }
         if (msg == API_SERVICE_SERVICE_ENUMSERVICE) {
             *static_cast<waServiceFactory**>(result) =
+                *static_cast<FOURCC*>(args[0]) == svc_imageWriter::getServiceType() ? &jpegFactory :
                 *static_cast<size_t*>(args[1]) == 0 ? &foreignFactory : &matchingFactory;
             return 1;
         }
@@ -177,6 +221,12 @@ int main()
         matchingProvider.requests != 1 || invalidArtworkCalls != 0 || globalLocks != 0 ||
         managerReleases != 0 || foreignFactory.releases != 1 || matchingFactory.releases != 1 || freedBuffers != 2)
         return 10;
+    useFallback = true;
+    wcscpy_s(borrowedPath, L"startup.mp3");
+    player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true, true);
+    if (conversions != 1 || artwork.size() != 4 || type != "image/jpeg" ||
+        invalidArtworkCalls != 0 || freedBuffers != 4 || albumFactory.releases != 1 ||
+        jpegFactory.releases != 1 || globalLocks != 0 || managerReleases != 0) return 13;
     char folder[MAX_PATH], ini[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, folder) || !GetTempFileNameA(folder, "apx", 0, ini)) return 11;
     WritePrivateProfileStringA("Remote Speakers output", "EnableArtwork", "1", ini);

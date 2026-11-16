@@ -1,5 +1,12 @@
 # Changes from upstream 5.6
 
+JPEG exception diagnosis, 2026-11-16:
+
+- Record the exception code, fault module/offset, access target, x86 registers
+  and stack addresses around the existing JPEG convert call. Continue exception
+  search unchanged; do not hide faults or substitute a different encoder.
+- Log conversion arguments to distinguish caller input from encoder failures.
+
 Artwork call tracing, 2026-11-16:
 
 - Add BEGIN/END markers around existing provider enumeration, interface lookup,
