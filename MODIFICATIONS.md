@@ -7,6 +7,8 @@ Winamp file-association startup safety, 2026-11-16:
 - Refresh metadata on the host UI thread after playback begins, using the window
   subclass and a bounded timer; cancel the timer on close/quit. Prevent recursive
   refresh when metadata services trigger another title notification.
+- Schedule that timer through a posted window message so `SetTimer` executes
+  on the thread owning the Winamp window.
 - Reject IPC pointer sentinel 1 and copy the host-owned filename before further
   IPC calls. Added fake-host tests for startup, worker calls and pointer lifetime.
 

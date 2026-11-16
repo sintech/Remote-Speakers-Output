@@ -50,6 +50,12 @@
 
 static const std::string INVALID_TITLE("** INVALID TITLE **"); // sentinel value
 
+static UINT metadataScheduleMessage()
+{
+	static const UINT message = RegisterWindowMessageW(L"Remote Speakers Output.DeferredMetadata");
+	return message;
+}
+
 extern HINSTANCE dllInstance;
 extern std::auto_ptr<WinampPlayer> player;
 
@@ -73,6 +79,7 @@ std::atomic<unsigned> Output::_metadataRefreshAttempts(0);
 
 void Output::init()
 {
+	metadataScheduleMessage(); // Register on the host UI thread before subclassing.
 	Debugger::print("Winamp Init: core build " + Plugin::version());
 	try
 	{
@@ -334,8 +341,8 @@ int Output::write(char* const buffer, const int length)
 			if (length > 0 && !_metadataSessionReady.exchange(true))
 			{
 				_metadataRefreshAttempts = 0;
-				if (!SetTimer(player->window(), reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc),
-					250, NULL))
+				const UINT message = metadataScheduleMessage();
+				if (!message || !PostMessage(player->window(), message, 0, 0))
 					Debugger::printLastError("Scheduling deferred metadata");
 			}
 			return 0;
@@ -536,6 +543,14 @@ void CALLBACK Output::metadataTimerProc(HWND window, UINT, UINT_PTR id, DWORD)
 
 LRESULT Output::playerWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	const UINT scheduleMessage = metadataScheduleMessage();
+	if (scheduleMessage && message == scheduleMessage)
+	{
+		if (_metadataSessionReady.load() &&
+			!SetTimer(window, reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc), 250, NULL))
+			Debugger::printLastError("Creating UI-thread metadata timer");
+		return 0;
+	}
 	if (message == WM_TIMER && wParam == reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc))
 	{
 		metadataTimerProc(window, message, wParam, 0);
