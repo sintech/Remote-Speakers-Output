@@ -1,4 +1,4 @@
-# Remote Speakers Output 6.0
+# Remote Speakers Output
 
 Stream audio to AirPlay/RAOP-compatible speakers and receivers. The current build
 provides a 32-bit Winamp output plugin, based on Eric Milles’
@@ -12,22 +12,11 @@ provides a 32-bit Winamp output plugin, based on Eric Milles’
    - `apxCore.dll` goes next to `winamp.exe`.
    - `out_apx.dll` goes into the `Plugins` folder.
 3. Start Winamp and open **Preferences → Plug-ins → Output**.
-4. Select **Remote Speakers output (6.0)**, click **Configure**, and select
+4. Select **Remote Speakers output**, click **Configure**, and select
    your receiver.
 
 Install Apple’s Bonjour service for automatic device discovery, or add the
 receiver manually in the plugin settings.
-
-## Playback settings
-
-Set **Playback delay (ms)** to a value between **100 and 2000**, click **Apply**,
-then press **Stop → Play**. The setting is saved automatically. Lower values
-reduce the requested buffering delay; raise it if audio drops out or the start
-of a track is missing. The receiver may add its own delay.
-
-The plugin supports track metadata, album artwork, and receiver volume control.
-Album artwork is retrieved through Winamp and encoded to JPEG using Windows
-Imaging Component (WIC).
 
 ## Build locally
 
