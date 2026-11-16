@@ -376,7 +376,7 @@ void DeviceManager::openDevice(const DeviceInfo& deviceInfo)
 			if (!isAnyDeviceOpen())
 			{
 				// before opening the first device, init shared session state
-				RAOP_ENGINE.reinit(_outputInterval);
+				RAOP_ENGINE.reinit(_outputInterval, Options::getOptions()->getSyncLatencyMs());
 				Debugger::print("DeviceManager: RSA/AES/ALAC session initialized.");
 			}
 

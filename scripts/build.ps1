@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [switch] $DependenciesOnly,
-    [ValidateRange(250, 5000)][int] $SyncLatencyMs = 1750,
+    [ValidateRange(100, 2000)][int] $SyncLatencyMs = 1750,
     [ValidateSet('dist', 'dist-low-latency')][string] $OutputDirectory = 'dist'
 )
 $ErrorActionPreference = 'Stop'

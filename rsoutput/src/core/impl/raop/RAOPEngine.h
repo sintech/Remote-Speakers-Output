@@ -62,7 +62,7 @@ public:
 	explicit RAOPEngine(OutputObserver&);
 	~RAOPEngine();
 
-	void reinit(OutputInterval&); // also recalibrates interval to new RTP time
+	void reinit(OutputInterval&, unsigned int syncLatencyMs = 1750); // also recalibrates interval to new RTP time
 
 	// returns interval for given length and offset relative to internal RTP time
 	OutputInterval getOutputInterval(time_t length, time_t offset) const;
@@ -107,6 +107,7 @@ private:
 
 	/** RTP audio latency (in number of samples per channel) */
 	unsigned int _audioLatency;
+	unsigned int _streamSyncDelaySamples = 77175;
 
 	/** RTP audio data packets */
 	PacketBuffer _rtpDataSecured;

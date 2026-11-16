@@ -42,6 +42,10 @@ public:
 	static void postNotification(Poco::Notification::Ptr);
 
 public:
+	enum { MIN_SYNC_LATENCY_MS = 100, MAX_SYNC_LATENCY_MS = 2000 };
+	unsigned int getSyncLatencyMs() const;
+	void setSyncLatencyMs(unsigned int);
+
 	bool getVolumeControl() const;
 	void setVolumeControl(bool);
 	bool getPlayerControl() const;
@@ -61,6 +65,7 @@ public:
 	void clearPassword(const std::string& deviceName);
 
 private:
+	unsigned int _syncLatencyMs = 1750;
 	bool _volumeControl;
 	bool _playerControl;
 	bool _resetOnPause;

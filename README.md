@@ -54,8 +54,8 @@ are required by the workflow.
 
 ## Reduced latency variant
 
-The **Remote-Speakers-Output-low-latency-x86** artifact sets the RTP sync delay
-to **750 ms**, compared with the original **1750 ms**. This requests audio about
+The **Remote-Speakers-Output-low-latency-x86** artifact uses a default RTP sync delay
+of **750 ms**, compared with the original **1750 ms**. This requests audio about
 one second earlier; the receiver may apply its own delay or minimum latency.
 It is experimental: test for missing audio at the start and dropouts on your
 receiver. The normal **Remote-Speakers-Output-x86** artifact retains 1750 ms.
@@ -66,6 +66,12 @@ For the reduced variant, build locally with:
 ```powershell
 pwsh -File scripts/build.ps1 -SyncLatencyMs 750 -OutputDirectory dist-low-latency
 ```
+
+In Winamp's output plugin configuration, set **Playback delay (ms)** from
+**100 to 2000**, click **Apply**, then **Stop** and **Play** to open a new session.
+The value is saved as `SyncLatencyMs` in `[Remote Speakers output]` in Winamp.ini.
+An existing saved value overrides the artifact default. Smaller values may cause
+missing audio or dropouts if the receiver/network cannot keep up.
 
 Build parameters are recorded in the artifact's `BUILD-OPTIONS.txt`. The maximum
 queue latency reported to Winamp is not a measured delay at the speaker.

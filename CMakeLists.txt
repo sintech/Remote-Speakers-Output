@@ -9,10 +9,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(APX_SYNC_LATENCY_MS 1750 CACHE STRING "RAOP sync delay in milliseconds (experimental below 1750)")
 if(NOT APX_SYNC_LATENCY_MS MATCHES "^[0-9]+$" OR
-    APX_SYNC_LATENCY_MS LESS 250 OR APX_SYNC_LATENCY_MS GREATER 5000)
-  message(FATAL_ERROR "APX_SYNC_LATENCY_MS must be an integer between 250 and 5000")
+    APX_SYNC_LATENCY_MS LESS 100 OR APX_SYNC_LATENCY_MS GREATER 2000)
+  message(FATAL_ERROR "APX_SYNC_LATENCY_MS must be an integer between 100 and 2000")
 endif()
-set_property(SOURCE rsoutput/src/core/impl/raop/RAOPEngine.cpp APPEND PROPERTY
+set_property(SOURCE rsoutput/src/core/impl/Options.cpp APPEND PROPERTY
   COMPILE_DEFINITIONS "APX_SYNC_LATENCY_MS=${APX_SYNC_LATENCY_MS}")
 set(DEPS "${CMAKE_SOURCE_DIR}/.deps" CACHE PATH "Prepared dependency sources")
 set(OPENSSL_ROOT_DIR "${DEPS}/install")

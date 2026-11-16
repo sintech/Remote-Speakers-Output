@@ -23,10 +23,16 @@ int main()
         Observer observer;
         RAOPEngine engine(observer);
         OutputInterval interval(0, 0);
-        for (int attempt = 0; attempt < 3; ++attempt) {
-            engine.reinit(interval); // RSA OAEP, AES key, ALAC encoder, UDP/reactor.
+        for (unsigned int delay : { 100U, 750U, 2000U }) {
+            engine.reinit(interval, delay); // RSA OAEP, AES key, ALAC encoder, UDP/reactor.
             if (engine.latency(RAOPEngine::outputFormat()) <= 0)
                 throw std::runtime_error("Invalid session latency");
+        }
+        for (unsigned int delay : { 99U, 2001U }) {
+            bool rejected = false;
+            try { engine.reinit(interval, delay); }
+            catch (const std::invalid_argument&) { rejected = true; }
+            if (!rejected) throw std::runtime_error("Out-of-range sync delay accepted");
         }
         Poco::Timestamp original(1700000000123456LL);
         NTPTimestamp ntp(original);

@@ -142,6 +142,21 @@ void Options::postNotification(Notification::Ptr notification)
 //------------------------------------------------------------------------------
 
 
+#ifndef APX_SYNC_LATENCY_MS
+#define APX_SYNC_LATENCY_MS 1750
+#endif
+
+unsigned int Options::getSyncLatencyMs() const
+{
+	return _syncLatencyMs;
+}
+
+void Options::setSyncLatencyMs(unsigned int value)
+{
+	_syncLatencyMs = (value >= MIN_SYNC_LATENCY_MS && value <= MAX_SYNC_LATENCY_MS)
+		? value : APX_SYNC_LATENCY_MS;
+}
+
 bool Options::getVolumeControl() const
 {
 	return _volumeControl;
@@ -277,6 +292,7 @@ bool operator ==(const Options& lhs, const Options& rhs)
 	if (lhs.getVolumeControl() != rhs.getVolumeControl()
 		|| lhs.getPlayerControl() != rhs.getPlayerControl()
 		|| lhs.getResetOnPause() != rhs.getResetOnPause()
+		|| lhs.getSyncLatencyMs() != rhs.getSyncLatencyMs()
 		|| lhs._activatedDevices.size() != rhs._activatedDevices.size()
 		|| !std::equal(lhs._activatedDevices.begin(), lhs._activatedDevices.end(),
 				rhs._activatedDevices.begin())
@@ -304,6 +320,10 @@ void OptionsUtils::loadOptions(const std::string& iniFilePath)
 	Debugger::printf("Reading plug-in options from '%s'...", iniFilePath.c_str());
 
 	Options::SharedPtr options = new Options;
+
+	options->setSyncLatencyMs(GetPrivateProfileIntA(Plugin::name().c_str(),
+		"SyncLatencyMs", APX_SYNC_LATENCY_MS, iniFilePath.c_str()));
+	Debugger::printf("Read 'SyncLatencyMs' value '%u'.", options->getSyncLatencyMs());
 
 	// read volume control flag
 	options->setVolumeControl(0 != GetPrivateProfileIntA(
@@ -451,6 +471,10 @@ void OptionsUtils::saveOptions(const std::string& iniFilePath)
 
 	WritePrivateProfileStringA(Plugin::name().c_str(), "EnableArtwork",
 		enableArtwork ? "1" : "0", iniFilePath.c_str());
+
+	WritePrivateProfileStringA(Plugin::name().c_str(), "SyncLatencyMs",
+		Poco::format("%u", options->getSyncLatencyMs()).c_str(), iniFilePath.c_str());
+	Debugger::printf("Wrote 'SyncLatencyMs' value '%u'.", options->getSyncLatencyMs());
 
 	// write volume control flag
 	WritePrivateProfileStringA(Plugin::name().c_str(), "VolumeControl",

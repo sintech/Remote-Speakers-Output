@@ -78,12 +78,6 @@ static std::string opensslFailure(const char* operation)
 static const uint16_t LOCAL_CONTROL_PORT = 6001;
 static const uint16_t LOCAL_TIMING_PORT = 6002;
 
-#ifndef APX_SYNC_LATENCY_MS
-#define APX_SYNC_LATENCY_MS 1750
-#endif
-static const unsigned int STREAM_SYNC_DELAY_SAMPLES =
-	(44100U * APX_SYNC_LATENCY_MS) / 1000U;
-
 // buffer approximately 2 seconds of unsent and 4 seconds of sent packets
 static const uint16_t PACKET_BUFFER_COUNT = 250;
 static const uint16_t PACKET_MEMORY_COUNT = 500;
@@ -348,7 +342,7 @@ RAOPEngine::~RAOPEngine()
 }
 
 
-void RAOPEngine::reinit(OutputInterval& outputInterval)
+void RAOPEngine::reinit(OutputInterval& outputInterval, unsigned int syncLatencyMs)
 {
 	// stop sending data and sync packets
 	stop();
@@ -356,6 +350,12 @@ void RAOPEngine::reinit(OutputInterval& outputInterval)
 	// test thread states
 	assert(_reactorThread.isRunning());
 	assert(!_senderThread.isRunning());
+
+	// Capture the setting once per session; never shift RTP time mid-stream.
+	if (syncLatencyMs < 100 || syncLatencyMs > 2000)
+		throw std::invalid_argument("Sync delay must be between 100 and 2000 ms");
+	_streamSyncDelaySamples = (RAOP_SAMPLES_PER_SECOND * syncLatencyMs) / 1000U;
+	Debugger::printf("RAOP session: configured sync delay %u ms.", syncLatencyMs);
 
 	// generate new AES encryption key
 	buffer_t key(16);
@@ -798,7 +798,7 @@ size_t RAOPEngine::sendDataPacket(const Timestamp& currentTime)
 	{
 		_firstDataTime = currentTime;
 		Debugger::printf("RAOP stream: first audio packet sent; sync delay %u ms.",
-			(unsigned int) APX_SYNC_LATENCY_MS);
+			(_streamSyncDelaySamples * 1000U) / RAOP_SAMPLES_PER_SECOND);
 	}
 
 	// update counters
@@ -819,7 +819,7 @@ void RAOPEngine::sendSyncPacket(const Timestamp& currentTime)
 	syncPacket.seqNum = 7;
 	syncPacket.ntpTime = currentTime;
 	syncPacket.rtpTime = _rtpTimeOutgoing;
-	syncPacket.rtpTimeLessLatency = (_rtpTimeOutgoing - STREAM_SYNC_DELAY_SAMPLES);
+	syncPacket.rtpTimeLessLatency = (_rtpTimeOutgoing - _streamSyncDelaySamples);
 	ByteOrder_toNetwork(syncPacket);
 
 	// send sync packet to each device

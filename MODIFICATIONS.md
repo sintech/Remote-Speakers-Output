@@ -1,5 +1,17 @@
 # Changes from upstream 5.6
 
+Configurable playback sync delay, 2026-11-16:
+
+- Add a numeric Playback delay (ms) field to the existing options dialog, range
+  100-2000. Validate before Apply, include it in dirty detection, and preserve
+  the controls' placement when the host stretches the dialog.
+- Persist SyncLatencyMs with other options; invalid INI values use the build's
+  default (1750 ms normal, 750 ms low-latency). Both artifacts support the range.
+- Capture delay during RAOP session reinitialization and use it for sync RTP
+  timestamps. Apply changes after Stop/Play, keeping an active session stable.
+- Test settings round trips, invalid settings, session initialization at both
+  boundaries and rejection of delays outside the range.
+
 System JPEG encoding, 2026-11-16:
 
 - Keep Winamp's raw providers and decoded album-art API. Encode decoded pixels

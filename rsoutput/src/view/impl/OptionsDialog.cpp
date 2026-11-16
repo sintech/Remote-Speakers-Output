@@ -130,6 +130,14 @@ BOOL OptionsDialog::isDialogMessage(LPMSG pMsg)
 
 void OptionsDialog::doApply()
 {
+	BOOL valid = FALSE;
+	const UINT delay = GetDlgItemInt(_impl->_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY, &valid, FALSE);
+	if (!valid || delay < Options::MIN_SYNC_LATENCY_MS || delay > Options::MAX_SYNC_LATENCY_MS) {
+		MessageDialog("Enter a playback delay from 100 to 2000 ms.", MB_ICONERROR).doModal(_impl->_dialogWindow);
+		SetFocus(GetDlgItem(_impl->_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY));
+		return;
+	}
+
 	// change active options to those specified by dialog
 	Options::setOptions(_impl->buildOptions());
 
@@ -177,6 +185,9 @@ void OptionsDialogImpl::doStatusUpdate()
 
 bool OptionsDialogImpl::isDirty() const
 {
+	BOOL valid = FALSE;
+	const UINT delay = GetDlgItemInt(_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY, &valid, FALSE);
+	if (!valid || delay < Options::MIN_SYNC_LATENCY_MS || delay > Options::MAX_SYNC_LATENCY_MS) return true;
 	return (!(*buildOptions() == *Options::getOptions()));
 }
 
@@ -217,6 +228,9 @@ void OptionsDialogImpl::onInitialize()
 		RepositionDlgItem(_dialogWindow, DIALOG_OPTIONS_CHECKBOX_VOLCONTROL, 0, heightDiff);
 		RepositionDlgItem(_dialogWindow, DIALOG_OPTIONS_CHECKBOX_PLYCONTROL, 0, heightDiff);
 		RepositionDlgItem(_dialogWindow, DIALOG_OPTIONS_CHECKBOX_RESETONPAUSE, 0, heightDiff);
+		RepositionDlgItem(_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY, 0, heightDiff);
+		RepositionDlgItem(_dialogWindow, DIALOG_OPTIONS_LABEL_LATENCY, 0, heightDiff);
+		RepositionDlgItem(_dialogWindow, DIALOG_OPTIONS_LABEL_LATENCY_RANGE, 0, heightDiff);
 	}
 
 	// set font of dialog controls to the enclosing window's font
@@ -238,6 +252,9 @@ void OptionsDialogImpl::onInitialize()
 	// set reset on pause checkbox value
 	CheckDlgButton(_dialogWindow, DIALOG_OPTIONS_CHECKBOX_RESETONPAUSE,
 		(options->getResetOnPause() ? BST_CHECKED : BST_UNCHECKED));
+
+	SetDlgItemInt(_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY, options->getSyncLatencyMs(), FALSE);
+	SendDlgItemMessage(_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY, EM_SETLIMITTEXT, 4, 0);
 
 	populateListbox(options->devices());
 
@@ -269,6 +286,10 @@ void OptionsDialogImpl::onCommand(WORD command, WORD control)
 			// update when checkbox is checked/unchecked
 			doStatusUpdate();
 		}
+		break;
+
+	case DIALOG_OPTIONS_EDIT_LATENCY:
+		if (command == EN_CHANGE) doStatusUpdate();
 		break;
 
 	case DIALOG_OPTIONS_LISTBOX_SPEAKERS:
@@ -781,6 +802,10 @@ Options::SharedPtr OptionsDialogImpl::buildOptions() const
 	// get reset on pause checkbox value
 	opts->setResetOnPause(IsDlgButtonChecked(_dialogWindow,
 		DIALOG_OPTIONS_CHECKBOX_RESETONPAUSE) == BST_CHECKED);
+
+	BOOL validDelay = FALSE;
+	const UINT delay = GetDlgItemInt(_dialogWindow, DIALOG_OPTIONS_EDIT_LATENCY, &validDelay, FALSE);
+	opts->setSyncLatencyMs(validDelay ? delay : 0);
 
 	// populate device info
 	enumerateListboxItems(opts);

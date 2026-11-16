@@ -252,8 +252,22 @@ int main()
     OptionsUtils::loadOptions(ini);
     OptionsUtils::saveOptions(ini);
     const bool preserved = GetPrivateProfileIntA("Remote Speakers output", "EnableArtwork", 0, ini) == 1;
-    DeleteFileA(ini);
     if (!preserved) return 12;
+    const UINT defaultDelay = GetPrivateProfileIntA("Remote Speakers output", "SyncLatencyMs", 0, ini);
+    if (defaultDelay < 100 || defaultDelay > 2000) return 14;
+    for (const char* value : { "100", "750", "2000" }) {
+        WritePrivateProfileStringA("Remote Speakers output", "SyncLatencyMs", value, ini);
+        OptionsUtils::loadOptions(ini);
+        OptionsUtils::saveOptions(ini);
+        if (GetPrivateProfileIntA("Remote Speakers output", "SyncLatencyMs", 0, ini) != std::atoi(value)) return 15;
+    }
+    for (const char* value : { "99", "2001", "-1", "invalid" }) {
+        WritePrivateProfileStringA("Remote Speakers output", "SyncLatencyMs", value, ini);
+        OptionsUtils::loadOptions(ini);
+        OptionsUtils::saveOptions(ini);
+        if (GetPrivateProfileIntA("Remote Speakers output", "SyncLatencyMs", 0, ini) != defaultDelay) return 16;
+    }
+    DeleteFileA(ini);
     DestroyWindow(window);
     std::puts("Startup, IPC ownership, raw artwork, real WIC JPEG dimensions/colors and settings preservation passed.");
     return 0;
