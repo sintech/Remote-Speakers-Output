@@ -69,6 +69,7 @@ private:
 
 private:
 	OutputSink::SharedPtr _deviceOutputSink;
+	unsigned int _sessionSyncLatencyMs = 0;
 
 	typedef std::map<std::string,Device::SharedPtr> DeviceMap;
 	DeviceMap _devices; // must be declared after device output sink

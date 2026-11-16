@@ -67,6 +67,13 @@ void DeviceManager::openDevices()
 	// hold reference to active options
 	const Options::SharedPtr options = Options::getOptions();
 
+	// Stop normally keeps receivers connected for eight seconds. A changed
+	// delay needs a fresh session even when Play follows Stop immediately.
+	if (_sessionSyncLatencyMs != 0 && _sessionSyncLatencyMs != options->getSyncLatencyMs()) {
+		Debugger::print("DeviceManager: reopening receivers for the new playback delay.");
+		closeDevices();
+	}
+
 	for (DeviceInfoSet::const_iterator it = options->devices().begin();
 		it != options->devices().end(); ++it)
 	{
@@ -376,7 +383,9 @@ void DeviceManager::openDevice(const DeviceInfo& deviceInfo)
 			if (!isAnyDeviceOpen())
 			{
 				// before opening the first device, init shared session state
-				RAOP_ENGINE.reinit(_outputInterval, Options::getOptions()->getSyncLatencyMs());
+				const unsigned int delay = Options::getOptions()->getSyncLatencyMs();
+				RAOP_ENGINE.reinit(_outputInterval, delay);
+				_sessionSyncLatencyMs = delay;
 				Debugger::print("DeviceManager: RSA/AES/ALAC session initialized.");
 			}
 

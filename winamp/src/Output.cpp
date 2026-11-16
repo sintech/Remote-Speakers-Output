@@ -215,6 +215,7 @@ INT_PTR Output::optionsDialogProc(HWND dialogWindow, UINT message, WPARAM wParam
 			{
 			case IDOK:
 				optionsDialog->doApply();
+				OptionsUtils::saveOptions(_iniFilePath);
 				break;
 			case IDCANCEL:
 				EndDialog(dialogWindow, 0);

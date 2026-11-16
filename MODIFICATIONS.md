@@ -7,6 +7,9 @@ Configurable playback sync delay, 2026-11-16:
   the controls' placement when the host stretches the dialog.
 - Persist SyncLatencyMs with other options; invalid INI values use the build's
   default (1750 ms normal, 750 ms low-latency). Both artifacts support the range.
+- Save Winamp settings on Apply. Reopen retained receiver connections on the
+  next playback open when delay changes, including immediate Stop/Play within
+  the existing eight-second connection reuse window.
 - Capture delay during RAOP session reinitialization and use it for sync RTP
   timestamps. Apply changes after Stop/Play, keeping an active session stable.
 - Test settings round trips, invalid settings, session initialization at both
