@@ -1,5 +1,20 @@
 # Changes from upstream 5.6
 
+System JPEG encoding, 2026-11-16:
+
+- Keep Winamp's raw providers and decoded album-art API. Encode decoded pixels
+  with the Microsoft WIC JPEG encoder at quality 80 instead of Winamp's writer.
+  Convert ARGB32 to 24-bit BGR scanlines; balance COM initialization and release
+  all COM objects. Log HRESULT failures and return empty artwork on codec errors.
+- In the supplied Winamp 5.9.2 build 10042 jpeg.w5s, writer RVA 0x2e80 sets
+  input_components=4 and JCS_RGB=2 (RVA 0x2fa5/0x2fd4), while the JPEG color
+  converter's RGB branch requires 3 components (RVA 0x195ab). Its fatal handler
+  calls exit(1) at RVA 0x3338. The external Winamp component is not modified.
+- Test real JPEG encoding/decoding, dimensions and RGB channel order, retain raw
+  provider/ownership checks, and assert Winamp image writers are never queried.
+- WIC is built into Vista and later. This does not certify older Windows support
+  for the modern toolchain and dependency set used by this build.
+
 JPEG exception diagnosis, 2026-11-16:
 
 - Record the exception code, fault module/offset, access target, x86 registers

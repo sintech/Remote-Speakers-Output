@@ -10,7 +10,8 @@
 #include <OptionsUtils.h>
 #include <wasabi/api_service.h>
 #include <wasabi/api_albumart.h>
-#include <wasabi/svc_imgwrite.h>
+#include <atlbase.h>
+#include <wincodec.h>
 #include <wasabi/api_memmgr.h>
 #include <wasabi/svc_albumArtProvider.h>
 #include <wasabi/waservicefactory.h>
@@ -19,7 +20,7 @@ static int invalidArtworkCalls = 0, globalLocks = 0, managerReleases = 0;
 static int serviceQueries = 0, freedBuffers = 0;
 static bool useFallback = false;
 static ARGB32* fallbackPixels = NULL;
-static int conversions = 0;
+static int unexpectedWriterQueries = 0;
 
 class ArtProvider : public svc_albumArtProvider {
 public:
@@ -93,28 +94,43 @@ public:
         return 1;
     }
 };
-class JpegWriter : public svc_imageWriter {
-public:
-    int _dispatch(int msg, void* result, void** args, int) override {
-        if (msg == BITDEPTHSUPPORTED) { *static_cast<int*>(result) = 1; return 1; }
-        if (msg == GETIMAGETYPENAME) { *static_cast<const wchar_t**>(result) = L"JPEG"; return 1; }
-        if (msg != CONVERT) return 0;
-        ++conversions;
-        const void* pixels = *static_cast<const void**>(args[0]);
-        if (pixels != fallbackPixels || *static_cast<int*>(args[1]) != 32 ||
-            *static_cast<int*>(args[2]) != 2 || *static_cast<int*>(args[3]) != 2 ||
-            static_cast<const ARGB32*>(pixels)[3] != 0xFF123456)
-            ++invalidArtworkCalls;
-        void* bytes = std::malloc(4);
-        std::memcpy(bytes, "JPEG", 4);
-        **static_cast<int**>(args[4]) = 4;
-        *static_cast<void**>(result) = bytes;
-        return 1;
-    }
-};
 static AlbumArt albumArt;
-static JpegWriter jpegWriter;
-static Factory albumFactory(&albumArt), jpegFactory(&jpegWriter);
+static Factory albumFactory(&albumArt);
+
+// Decode the actual system-encoded JPEG and check channel order, not just a mock.
+static bool verifyJPEG(const buffer_t& jpeg)
+{
+    if (jpeg.size() < 4 || jpeg[0] != 0xFF || jpeg[1] != 0xD8) return false;
+    HRESULT apartment = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(apartment)) return false;
+    bool valid = false;
+    {
+        CComPtr<IWICImagingFactory> factory;
+        CComPtr<IWICStream> stream;
+        CComPtr<IWICBitmapDecoder> decoder;
+        CComPtr<IWICBitmapFrameDecode> frame;
+        CComPtr<IWICFormatConverter> converter;
+        UINT width = 0, height = 0;
+        BYTE pixels[12] = {};
+        valid = SUCCEEDED(factory.CoCreateInstance(CLSID_WICImagingFactory)) &&
+            SUCCEEDED(factory->CreateStream(&stream)) &&
+            SUCCEEDED(stream->InitializeFromMemory(const_cast<BYTE*>(jpeg.data()), static_cast<DWORD>(jpeg.size()))) &&
+            SUCCEEDED(factory->CreateDecoderFromStream(stream, NULL, WICDecodeMetadataCacheOnLoad, &decoder)) &&
+            SUCCEEDED(decoder->GetFrame(0, &frame)) &&
+            SUCCEEDED(frame->GetSize(&width, &height)) && width == 2 && height == 2 &&
+            SUCCEEDED(factory->CreateFormatConverter(&converter)) &&
+            SUCCEEDED(converter->Initialize(frame, GUID_WICPixelFormat24bppRGB, WICBitmapDitherTypeNone,
+                NULL, 0.0, WICBitmapPaletteTypeCustom)) &&
+            SUCCEEDED(converter->CopyPixels(NULL, 6, sizeof(pixels), pixels));
+        for (int i = 0; valid && i < 4; ++i) {
+            valid = std::abs(int(pixels[i*3]) - 0x12) <= 8 &&
+                std::abs(int(pixels[i*3+1]) - 0x34) <= 8 &&
+                std::abs(int(pixels[i*3+2]) - 0x56) <= 8;
+        }
+    }
+    CoUninitialize();
+    return valid;
+}
 
 static ArtProvider foreignProvider(false), matchingProvider(true);
 static MemoryManager memoryManager;
@@ -130,12 +146,14 @@ public:
             return 1;
         }
         if (msg == API_SERVICE_SERVICE_GETNUMSERVICES) {
-            *static_cast<int*>(result) = *static_cast<FOURCC*>(args[0]) == svc_imageWriter::getServiceType() ? 1 : 2;
+            if (*static_cast<FOURCC*>(args[0]) == WaSvc::IMAGEWRITER) {
+                ++unexpectedWriterQueries;
+                *static_cast<int*>(result) = 0;
+            } else *static_cast<int*>(result) = 2;
             return 1;
         }
         if (msg == API_SERVICE_SERVICE_ENUMSERVICE) {
             *static_cast<waServiceFactory**>(result) =
-                *static_cast<FOURCC*>(args[0]) == svc_imageWriter::getServiceType() ? &jpegFactory :
                 *static_cast<size_t*>(args[1]) == 0 ? &foreignFactory : &matchingFactory;
             return 1;
         }
@@ -224,9 +242,9 @@ int main()
     useFallback = true;
     wcscpy_s(borrowedPath, L"startup.mp3");
     player.getPlaybackMetadata(title, album, artist, artwork, type, playlist, true, true);
-    if (conversions != 1 || artwork.size() != 4 || type != "image/jpeg" ||
-        invalidArtworkCalls != 0 || freedBuffers != 4 || albumFactory.releases != 1 ||
-        jpegFactory.releases != 1 || globalLocks != 0 || managerReleases != 0) return 13;
+    if (unexpectedWriterQueries != 0 || type != "image/jpeg" || !verifyJPEG(artwork) ||
+        invalidArtworkCalls != 0 || freedBuffers != 3 || albumFactory.releases != 1 ||
+        globalLocks != 0 || managerReleases != 0) return 13;
     char folder[MAX_PATH], ini[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, folder) || !GetTempFileNameA(folder, "apx", 0, ini)) return 11;
     WritePrivateProfileStringA("Remote Speakers output", "EnableArtwork", "1", ini);
@@ -236,6 +254,6 @@ int main()
     DeleteFileA(ini);
     if (!preserved) return 12;
     DestroyWindow(window);
-    std::puts("Startup, IPC ownership, artwork defaults/provider ownership and settings preservation passed.");
+    std::puts("Startup, IPC ownership, raw artwork, real WIC JPEG dimensions/colors and settings preservation passed.");
     return 0;
 }

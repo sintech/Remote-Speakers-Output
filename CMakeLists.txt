@@ -45,7 +45,7 @@ target_link_libraries(apxCore PRIVATE samplerate Poco::Foundation Poco::Net
 add_library(out_apx SHARED winamp/src/Main.cpp winamp/src/Output.cpp
   winamp/src/WinampHooks.cpp winamp/src/WinampPlayer.cpp winamp/src/Resources.rc)
 target_include_directories(out_apx PRIVATE winamp/sdk rsoutput/sdk)
-target_link_libraries(out_apx PRIVATE apxCore ole32 oleaut32 shell32 user32)
+target_link_libraries(out_apx PRIVATE apxCore ole32 oleaut32 shell32 user32 windowscodecs)
 
 foreach(target apxCore out_apx)
   target_compile_definitions(${target} PRIVATE UNICODE _UNICODE NOMINMAX
@@ -66,7 +66,7 @@ target_include_directories(metadata_startup PRIVATE winamp/src winamp/sdk rsoutp
 target_compile_definitions(metadata_startup PRIVATE UNICODE _UNICODE NOMINMAX
   WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601 _CRT_SECURE_NO_WARNINGS)
 target_compile_options(metadata_startup PRIVATE /utf-8)
-target_link_libraries(metadata_startup PRIVATE apxCore ole32 oleaut32 shell32 user32)
+target_link_libraries(metadata_startup PRIVATE apxCore ole32 oleaut32 shell32 user32 windowscodecs)
 add_test(NAME metadata_startup_safety COMMAND metadata_startup)
 set_tests_properties(metadata_startup_safety PROPERTIES TIMEOUT 15)
 add_executable(core_startup tests/core_startup.cpp

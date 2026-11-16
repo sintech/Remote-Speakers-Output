@@ -26,6 +26,8 @@
 #include <string>
 #include <vector>
 #include <atlenc.h>
+#include <atlbase.h>
+#include <wincodec.h>
 #include <comdef.h>
 #include <objbase.h>
 #include <windows.h>
@@ -37,7 +39,6 @@
 #include <wasabi/api_memmgr.h>
 #include <wasabi/api_service.h>
 #include <wasabi/svc_albumArtProvider.h>
-#include <wasabi/svc_imgwrite.h>
 #include <wasabi/waservicefactory.h>
 
 #pragma region support functions
@@ -45,8 +46,7 @@
 using std::exception;
 
 
-static buffer_t ToJPEG(ARGB32* const data, const int wdth, const int hght,
-	api_service* const apiService, api_memmgr* const memMgmtService);
+static buffer_t ToJPEG(const ARGB32* data, int width, int height);
 
 
 static std::string ToUTF8(const wchar_t* const wideCharString)
@@ -209,7 +209,7 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 			{
 				if (wdth > 0 && hght > 0)
 				{
-					imageData = ToJPEG(data, wdth, hght, apiService, memMgmtService);
+					imageData = ToJPEG(data, wdth, hght);
 					imageType = "image/jpeg";
 				}
 
@@ -229,118 +229,75 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 }
 
 
-// Keep the fault visible to Winamp/Windows; only record evidence before unwind.
-static void LogArtworkAddress(const char* label, const void* address)
+// Winamp 5.9.2's JPEG writer passes four RGB components to a library that
+// requires three and calls exit(1). Encode only this fallback through WIC.
+static buffer_t ToJPEG(const ARGB32* data, int width, int height)
 {
-	HMODULE module = NULL;
-	char path[MAX_PATH] = {};
-	if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-		GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-		reinterpret_cast<LPCSTR>(address), &module))
-		GetModuleFileNameA(module, path, MAX_PATH);
-	Debugger::printf("Artwork exception: %s address=%p module=%s offset=0x%IX.",
-		label, address, path[0] ? path : "unknown",
-		reinterpret_cast<UINT_PTR>(address) - reinterpret_cast<UINT_PTR>(module));
-}
-
-static LONG LogArtworkException(EXCEPTION_POINTERS* info)
-{
-	const EXCEPTION_RECORD* record = info->ExceptionRecord;
-	Debugger::printf("Artwork exception: code=0x%08lX flags=0x%08lX.",
-		record->ExceptionCode, record->ExceptionFlags);
-	LogArtworkAddress("fault", record->ExceptionAddress);
-	if ((record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ||
-		record->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) && record->NumberParameters >= 2)
-		Debugger::printf("Artwork exception: access=%Iu target=%p (0=read, 1=write, 8=execute).",
-			record->ExceptionInformation[0], reinterpret_cast<void*>(record->ExceptionInformation[1]));
-#ifdef _M_IX86
-	const CONTEXT* context = info->ContextRecord;
-	Debugger::printf("Artwork exception: EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX ESI=%08lX EDI=%08lX ESP=%08lX EBP=%08lX.",
-		context->Eax, context->Ebx, context->Ecx, context->Edx,
-		context->Esi, context->Edi, context->Esp, context->Ebp);
-#endif
-	void* frames[24] = {};
-	const USHORT count = CaptureStackBackTrace(0, 24, frames, NULL);
-	for (USHORT i = 0; i < count; ++i) LogArtworkAddress("stack", frames[i]);
-	return EXCEPTION_CONTINUE_SEARCH;
-}
-
-// Separate function: MSVC SEH cannot share a function with C++ unwind objects.
-static void* ConvertArtworkJPEG(svc_imageWriter* writer, const void* data,
-	int width, int height, int* size)
-{
-	Debugger::printf("Artwork JPEG: convert arguments pixels=%p depth=32 width=%i height=%i.",
-		data, width, height);
-	__try {
-		return writer->convert(data, 32, width, height, size);
+	buffer_t jpeg;
+	if (!data || width <= 0 || height <= 0 ||
+		static_cast<size_t>(width) > (std::numeric_limits<UINT>::max)() / 3 / height)
+		return jpeg;
+	const HRESULT apartment = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	if (FAILED(apartment) && apartment != RPC_E_CHANGED_MODE) {
+		Debugger::printf("Artwork WIC: COM initialization failed, HRESULT=0x%08lX.", apartment);
+		return jpeg;
 	}
-	__except (LogArtworkException(GetExceptionInformation())) {
-		return NULL; // EXCEPTION_CONTINUE_SEARCH never enters this handler.
-	}
-}
-
-static buffer_t ToJPEG(ARGB32* const data, const int wdth, const int hght,
-	api_service* const apiService, api_memmgr* const memMgmtService)
-{
-	buffer_t jpeg(0);
-
-	Debugger::print("Artwork JPEG: count encoders BEGIN.");
-	const size_t n = apiService->service_getNumServices(
-						svc_imageWriter::getServiceType());
-	Debugger::printf("Artwork JPEG: count encoders END, count=%u.", (unsigned int) n);
-	for (size_t i = 0; i < n; ++i)
-	{
-		Debugger::printf("Artwork JPEG encoder %u: enum BEGIN.", (unsigned int) i);
-		waServiceFactory* const imgServiceFactory =
-			apiService->service_enumService(svc_imageWriter::getServiceType(), i);
-		Debugger::printf("Artwork JPEG encoder %u: enum END, present=%i.", (unsigned int) i, imgServiceFactory != NULL);
-		if (imgServiceFactory != NULL)
-		{
-			Debugger::print("Artwork JPEG: getInterface BEGIN.");
-			svc_imageWriter* const imgService =
-				(svc_imageWriter*) imgServiceFactory->getInterface(FALSE);
-			Debugger::printf("Artwork JPEG: getInterface END, present=%i.", imgService != NULL);
-			if (imgService != NULL)
-			{
-				Debugger::print("Artwork JPEG: querying encoder capabilities BEGIN.");
-				const bool supports32 = imgService->bitDepthSupported(32);
-				Debugger::printf("Artwork JPEG: bitDepthSupported END, supports32=%i.", (int) supports32);
-				const wchar_t* typeName = NULL;
-				if (supports32) {
-					Debugger::print("Artwork JPEG: getImageTypeName BEGIN.");
-					typeName = imgService->getImageTypeName();
-					Debugger::printf("Artwork JPEG: getImageTypeName END, present=%i.", typeName != NULL);
-				}
-				Debugger::print("Artwork JPEG: matching type name BEGIN.");
-				const bool isJpeg = typeName && typeName == std::wstring(L"JPEG");
-				Debugger::printf("Artwork JPEG: matching type name END, isJpeg=%i.", (int) isJpeg);
-				if (isJpeg)
-				{
-					Debugger::print("Artwork JPEG: matching encoder; convert BEGIN.");
-					int   jpegSize = 0;
-					void* jpegData = ConvertArtworkJPEG(imgService, data, wdth, hght, &jpegSize);
-					Debugger::printf("Artwork JPEG: convert END, bytes=%i, data=%i.", jpegSize, jpegData != NULL);
-					if (jpegData != NULL && jpegSize > 0)
-					{
-						jpeg.resize(jpegSize);
-						std::memcpy(&jpeg[0], jpegData, jpegSize);
-					}
-
-					if (jpegData) {
-						Debugger::print("Artwork JPEG: free JPEG BEGIN.");
-						memMgmtService->sysFree(jpegData);
-						Debugger::print("Artwork JPEG: free JPEG END.");
-					}
-				}
-
-				Debugger::print("Artwork JPEG: releaseInterface BEGIN.");
-				imgServiceFactory->releaseInterface(imgService);
-				Debugger::print("Artwork JPEG: releaseInterface END.");
+	struct ApartmentGuard {
+		bool owned;
+		~ApartmentGuard() { if (owned) CoUninitialize(); }
+	} apartmentGuard = { SUCCEEDED(apartment) };
+	try {
+		CComPtr<IWICImagingFactory> factory;
+		CComPtr<IWICBitmapEncoder> encoder;
+		CComPtr<IWICBitmapFrameEncode> frame;
+		CComPtr<IPropertyBag2> options;
+		CComPtr<IStream> stream;
+		auto check = [](HRESULT result) { if (FAILED(result)) _com_issue_error(result); };
+		check(factory.CoCreateInstance(CLSID_WICImagingFactory));
+		check(CreateStreamOnHGlobal(NULL, TRUE, &stream));
+		check(factory->CreateEncoder(GUID_ContainerFormatJpeg, &GUID_VendorMicrosoft, &encoder));
+		check(encoder->Initialize(stream, WICBitmapEncoderNoCache));
+		check(encoder->CreateNewFrame(&frame, &options));
+		PROPBAG2 property = {};
+		property.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
+		CComVariant quality(0.8f);
+		check(options->Write(1, &property, &quality));
+		check(frame->Initialize(options));
+		check(frame->SetSize(width, height));
+		WICPixelFormatGUID format = GUID_WICPixelFormat24bppBGR;
+		check(frame->SetPixelFormat(&format));
+		if (!IsEqualGUID(format, GUID_WICPixelFormat24bppBGR))
+			_com_issue_error(WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT);
+		const UINT stride = static_cast<UINT>(width) * 3;
+		std::vector<BYTE> row(stride);
+		Debugger::printf("Artwork WIC: encoding JPEG, width=%i height=%i.", width, height);
+		for (int y = 0; y < height; ++y) {
+			const ARGB32* source = data + static_cast<size_t>(y) * width;
+			for (int x = 0; x < width; ++x) {
+				row[x * 3] = static_cast<BYTE>(source[x]);
+				row[x * 3 + 1] = static_cast<BYTE>(source[x] >> 8);
+				row[x * 3 + 2] = static_cast<BYTE>(source[x] >> 16);
 			}
-
+			check(frame->WritePixels(1, stride, stride, row.data()));
 		}
+		check(frame->Commit());
+		check(encoder->Commit());
+		STATSTG info = {};
+		check(stream->Stat(&info, STATFLAG_NONAME));
+		if (info.cbSize.HighPart || info.cbSize.LowPart == 0)
+			_com_issue_error(E_FAIL);
+		LARGE_INTEGER start = {};
+		check(stream->Seek(start, STREAM_SEEK_SET, NULL));
+		jpeg.resize(info.cbSize.LowPart);
+		ULONG read = 0;
+		check(stream->Read(jpeg.data(), static_cast<ULONG>(jpeg.size()), &read));
+		if (read != jpeg.size()) _com_issue_error(E_FAIL);
+		Debugger::printf("Artwork WIC: JPEG ready, bytes=%u.", static_cast<unsigned>(jpeg.size()));
 	}
-
+	catch (const _com_error& error) {
+		Debugger::printf("Artwork WIC: JPEG failed, HRESULT=0x%08lX.", error.Error());
+		jpeg.clear();
+	}
 	return jpeg;
 }
 
