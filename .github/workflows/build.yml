@@ -58,6 +58,9 @@ jobs:
       - name: Build and check DLL loading
         shell: pwsh
         run: ./scripts/build.ps1
+      - name: Build and test reduced latency variant
+        shell: pwsh
+        run: ./scripts/build.ps1 -SyncLatencyMs 750 -OutputDirectory dist-low-latency
       - name: Package matching source and dependency archives
         shell: pwsh
         run: |
@@ -83,4 +86,10 @@ jobs:
         with:
           name: Remote-Speakers-Output-source
           path: source-package/
+          if-no-files-found: error
+      - name: Upload reduced latency plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: Remote-Speakers-Output-low-latency-x86
+          path: dist-low-latency/
           if-no-files-found: error

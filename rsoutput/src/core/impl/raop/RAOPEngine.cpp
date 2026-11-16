@@ -78,6 +78,12 @@ static std::string opensslFailure(const char* operation)
 static const uint16_t LOCAL_CONTROL_PORT = 6001;
 static const uint16_t LOCAL_TIMING_PORT = 6002;
 
+#ifndef APX_SYNC_LATENCY_MS
+#define APX_SYNC_LATENCY_MS 1750
+#endif
+static const unsigned int STREAM_SYNC_DELAY_SAMPLES =
+	(44100U * APX_SYNC_LATENCY_MS) / 1000U;
+
 // buffer approximately 2 seconds of unsent and 4 seconds of sent packets
 static const uint16_t PACKET_BUFFER_COUNT = 250;
 static const uint16_t PACKET_MEMORY_COUNT = 500;
@@ -791,6 +797,8 @@ size_t RAOPEngine::sendDataPacket(const Timestamp& currentTime)
 	if (packetHeader.getMarker())
 	{
 		_firstDataTime = currentTime;
+		Debugger::printf("RAOP stream: first audio packet sent; sync delay %u ms.",
+			(unsigned int) APX_SYNC_LATENCY_MS);
 	}
 
 	// update counters
@@ -811,7 +819,7 @@ void RAOPEngine::sendSyncPacket(const Timestamp& currentTime)
 	syncPacket.seqNum = 7;
 	syncPacket.ntpTime = currentTime;
 	syncPacket.rtpTime = _rtpTimeOutgoing;
-	syncPacket.rtpTimeLessLatency = (_rtpTimeOutgoing - 77175);
+	syncPacket.rtpTimeLessLatency = (_rtpTimeOutgoing - STREAM_SYNC_DELAY_SAMPLES);
 	ByteOrder_toNetwork(syncPacket);
 
 	// send sync packet to each device

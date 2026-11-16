@@ -1,6 +1,10 @@
 # Added 2026-11-16. SPDX-License-Identifier: GPL-3.0-or-later
 [CmdletBinding()]
-param([switch] $DependenciesOnly)
+param(
+    [switch] $DependenciesOnly,
+    [ValidateRange(250, 5000)][int] $SyncLatencyMs = 1750,
+    [ValidateSet('dist', 'dist-low-latency')][string] $OutputDirectory = 'dist'
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
@@ -71,21 +75,24 @@ if (-not (Test-Path "$prefix/lib/cmake/Poco/PocoConfig.cmake")) {
 }
 
 if ($DependenciesOnly) { return }
+$dist = Join-Path $root $OutputDirectory
 
-Invoke-Checked -program cmake -arguments @('-S', $root, '-B', 'build', '-G', 'Visual Studio 17 2022', '-A', 'Win32')
+Invoke-Checked -program cmake -arguments @('-S', $root, '-B', 'build', '-G', 'Visual Studio 17 2022', '-A', 'Win32', "-DAPX_SYNC_LATENCY_MS=$SyncLatencyMs")
 Invoke-Checked -program cmake -arguments @('--build', 'build', '--config', 'Release', '--parallel', '2')
 Invoke-Checked -program ctest -arguments @('--test-dir', 'build', '-C', 'Release', '--output-on-failure')
-Invoke-Checked -program cmake -arguments @('--install', 'build', '--config', 'Release', '--prefix', 'dist')
+Invoke-Checked -program cmake -arguments @('--install', 'build', '--config', 'Release', '--prefix', $dist)
 
-New-Item -ItemType Directory -Force 'dist/licenses' | Out-Null
-Copy-Item 'LICENSE*', 'README.md', 'MODIFICATIONS.md', 'scripts/dependencies.json' 'dist/'
-Copy-Item "$deps/openssl/LICENSE.txt" 'dist/licenses/OpenSSL.txt'
-Copy-Item "$deps/poco/LICENSE" 'dist/licenses/Poco.txt'
-Copy-Item "$deps/samplerate/COPYING" 'dist/licenses/libsamplerate.txt'
-Copy-Item "$deps/alac/codec/APPLE_LICENSE.txt" 'dist/licenses/ALAC.txt'
-Copy-Item "$deps/bonjour/dns_sd.h" 'dist/licenses/Bonjour-header.h'
-Get-ChildItem 'dist' -Filter '*.dll' -Recurse | ForEach-Object {
+New-Item -ItemType Directory -Force "$dist/licenses" | Out-Null
+Copy-Item 'LICENSE*', 'README.md', 'MODIFICATIONS.md', 'scripts/dependencies.json' $dist
+Copy-Item "$deps/openssl/LICENSE.txt" "$dist/licenses/OpenSSL.txt"
+Copy-Item "$deps/poco/LICENSE" "$dist/licenses/Poco.txt"
+Copy-Item "$deps/samplerate/COPYING" "$dist/licenses/libsamplerate.txt"
+Copy-Item "$deps/alac/codec/APPLE_LICENSE.txt" "$dist/licenses/ALAC.txt"
+Copy-Item "$deps/bonjour/dns_sd.h" "$dist/licenses/Bonjour-header.h"
+Get-ChildItem $dist -Filter '*.dll' -Recurse | ForEach-Object {
     $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    $relative = [IO.Path]::GetRelativePath((Join-Path $root 'dist'), $_.FullName).Replace('\', '/')
+    $relative = [IO.Path]::GetRelativePath($dist, $_.FullName).Replace('\', '/')
     "$hash  $relative"
-} | Set-Content 'dist/SHA256SUMS.txt'
+} | Set-Content "$dist/SHA256SUMS.txt"
+
+"sync_latency_ms=$SyncLatencyMs`nconnection_poll_ms=25" | Set-Content "$dist/BUILD-OPTIONS.txt"

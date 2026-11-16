@@ -14,6 +14,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+// Modified 2026-11-16: faster connection polling, preserving timeout durations.
 #include "ConnectDialog.h"
 #include "Debugger.h"
 #include "Dialog.h"
@@ -34,6 +35,8 @@ using Poco::Net::Socket;
 using Poco::Net::SocketAddress;
 using Poco::Net::StreamSocket;
 
+static const uint32_t CONNECT_TIMER_MS = 25;
+static const uint32_t CONNECT_RETRY_TICKS = 5000 / CONNECT_TIMER_MS;
 
 class ConnectDialogImpl
 :
@@ -129,7 +132,7 @@ void ConnectDialogImpl::onInitialize()
 	assert(returnCode != 0);
 
 	// start timer to facilitate showing dialog and updating progress bar
-	if (SetTimer(_dialogWindow, (UINT_PTR) this, 250, NULL) < 1)
+	if (SetTimer(_dialogWindow, (UINT_PTR) this, CONNECT_TIMER_MS, NULL) < 1)
 	{
 		Debugger::printLastError("SetTimer", __FILE__, __LINE__);
 	}
@@ -174,15 +177,16 @@ void ConnectDialogImpl::onCommand(WORD command, WORD control)
 
 void ConnectDialogImpl::onTimer()
 {
+	_milliseconds += CONNECT_TIMER_MS;
 	if (!IsWindowVisible(_dialogWindow))
 	{
-		if ((_milliseconds += 250) >= 3000)
+		if (_milliseconds >= 3000)
 		{
 			// show dialog after 3 seconds
 			ShowWindow(_dialogWindow, SW_SHOW);
 		}
 	}
-	else
+	else if (_milliseconds % 250 == 0)
 	{
 		// update progress bar
 		LRESULT progressLimit = SendDlgItemMessage(_dialogWindow,
@@ -206,7 +210,7 @@ void ConnectDialogImpl::onTimer()
 			KillTimer(_dialogWindow, (UINT_PTR) this);
 			endDialog(0);
 		}
-		else if (_device.isZeroConf() && _connectCount++ > 20)
+		else if (_device.isZeroConf() && _connectCount++ > CONNECT_RETRY_TICKS)
 		{
 			// start over
 			_socket.close();

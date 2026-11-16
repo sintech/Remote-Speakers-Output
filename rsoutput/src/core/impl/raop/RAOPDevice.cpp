@@ -1,3 +1,4 @@
+// Modified 2026-11-16: record receiver latency for playback diagnostics.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -193,6 +194,8 @@ int RAOPDevice::open(StreamSocket& socket, AudioJackStatus& audioJackStatus)
 	}
 
 	_raopEngine.attach(this);
+	Debugger::printf("RAOP receiver: Audio-Latency header = %u samples (%.1f ms).",
+		_audioLatency, _audioLatency * 1000.0 / 44100.0);
 
 	return 0;
 }

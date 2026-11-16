@@ -1,5 +1,15 @@
 # Changes from upstream 5.6
 
+Reduced start latency, 2026-11-16:
+
+- Connection readiness is checked every 25 ms instead of 250 ms. The 3-second
+  dialog delay, approximately 5-second retry and progress update rate are kept.
+- Made the original 1750 ms RTP synchronization delay a CMake build option.
+  CI also builds a separate experimental 750 ms variant. Queue and retransmit
+  capacity is kept; the sender already sends its first data without filling it.
+- Log the receiver-reported Audio-Latency and time of first audio packet.
+- Both variants retain diagnostic logging and run the startup/load checks.
+
 Playback diagnostics, 2026-11-16:
 
 - Added a bounded local `%TEMP%\out_apx.log` file with timestamps and thread IDs.

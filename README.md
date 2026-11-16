@@ -52,6 +52,24 @@ Outputs are in `dist/`. Dependencies are downloaded and built under `.deps/`.
 To rebuild dependencies from scratch, remove `.deps/`. No credentials or secrets
 are required by the workflow.
 
+## Reduced latency variant
+
+The **Remote-Speakers-Output-low-latency-x86** artifact sets the RTP sync delay
+to **750 ms**, compared with the original **1750 ms**. This requests audio about
+one second earlier; the receiver may apply its own delay or minimum latency.
+It is experimental: test for missing audio at the start and dropouts on your
+receiver. The normal **Remote-Speakers-Output-x86** artifact retains 1750 ms.
+Both variants poll connection readiness at 25 ms instead of 250 ms.
+
+For the reduced variant, build locally with:
+
+```powershell
+pwsh -File scripts/build.ps1 -SyncLatencyMs 750 -OutputDirectory dist-low-latency
+```
+
+Build parameters are recorded in the artifact's `BUILD-OPTIONS.txt`. The maximum
+queue latency reported to Winamp is not a measured delay at the speaker.
+
 ## Playback diagnostics
 
 This build writes a bounded (2 MiB) UTF-8 log to `%TEMP%\out_apx.log`.
