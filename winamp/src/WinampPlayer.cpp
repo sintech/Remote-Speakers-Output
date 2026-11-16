@@ -112,45 +112,68 @@ static void GetVisualFileInfo(buffer_t& imageData, std::string& imageType,
 	const wchar_t* const infoType, const wchar_t* const filePath,
 	api_service* const apiService, api_memmgr* const memMgmtService)
 {
+	Debugger::print("Artwork providers: counting services BEGIN.");
 	const size_t n = apiService->service_getNumServices(
 						svc_albumArtProvider::getServiceType());
+	Debugger::printf("Artwork providers: counting services END, count=%u.", (unsigned int) n);
 	for (size_t i = 0; i < n; ++i)
 	{
+		const unsigned int providerIndex = (unsigned int) i;
+		Debugger::printf("Artwork provider %u: enum BEGIN.", providerIndex);
 		waServiceFactory* const aapServiceFactory =
 			apiService->service_enumService(svc_albumArtProvider::getServiceType(), i);
+		Debugger::printf("Artwork provider %u: enum END, present=%i.", providerIndex, aapServiceFactory != NULL);
 		if (aapServiceFactory != NULL)
 		{
+			Debugger::printf("Artwork provider %u: getInterface BEGIN.", providerIndex);
 			svc_albumArtProvider* const aapService =
 				(svc_albumArtProvider*) aapServiceFactory->getInterface(FALSE);
+			Debugger::printf("Artwork provider %u: getInterface END, present=%i.", providerIndex, aapService != NULL);
 			if (aapService != NULL)
 			{
+				Debugger::printf("Artwork provider %u: IsMine BEGIN.", providerIndex);
 				const bool matches = aapService->IsMine(filePath);
-				Debugger::printf("Artwork: provider %u matches=%i.", (unsigned int) i, (int) matches);
+				Debugger::printf("Artwork provider %u: IsMine END, matches=%i.", providerIndex, (int) matches);
 				if (matches)
 				{
 					void*     data = 0;
 					size_t    size = 0;
 					wchar_t*  type = 0;
+					Debugger::printf("Artwork provider %u: GetAlbumArtData BEGIN.", providerIndex);
 					const int code = aapService->GetAlbumArtData(
 						filePath, infoType, &data, &size, &type);
+					Debugger::printf("Artwork provider %u: GetAlbumArtData END, code=%i, bytes=%u, data=%i, mime=%i.",
+						providerIndex, code, (unsigned int) size, data != NULL, type != NULL);
 					if (code == ALBUMARTPROVIDER_SUCCESS && data != 0)
 					{
 						if (size != 0 && type != 0)
 						{
+							Debugger::printf("Artwork provider %u: copying image and MIME BEGIN.", providerIndex);
 							imageData.resize(size);
 							std::memcpy(&imageData[0], data, size);
 							imageType = "image/" + ToUTF8(type);
+							Debugger::printf("Artwork provider %u: copying image and MIME END.", providerIndex);
 
 							i = n; // break out of loop after cleanup
 						}
 
-						if (data) memMgmtService->sysFree(data);
-						if (type) memMgmtService->sysFree(type);
+						if (data) {
+							Debugger::printf("Artwork provider %u: free image BEGIN.", providerIndex);
+							memMgmtService->sysFree(data);
+							Debugger::printf("Artwork provider %u: free image END.", providerIndex);
+						}
+						if (type) {
+							Debugger::printf("Artwork provider %u: free MIME BEGIN.", providerIndex);
+							memMgmtService->sysFree(type);
+							Debugger::printf("Artwork provider %u: free MIME END.", providerIndex);
+						}
 					}
 
 				}
 
+				Debugger::printf("Artwork provider %u: releaseInterface BEGIN.", providerIndex);
 				aapServiceFactory->releaseInterface(aapService);
+				Debugger::printf("Artwork provider %u: releaseInterface END.", providerIndex);
 			}
 
 		}
@@ -162,19 +185,26 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 	const wchar_t* const infoType, const wchar_t* const filePath,
 	api_service* const apiService, api_memmgr* const memMgmtService)
 {
+	Debugger::print("Artwork fallback: getServiceByGuid BEGIN.");
 	waServiceFactory* const aaServiceFactory =
 		apiService->service_getServiceByGuid(albumArtGUID);
+	Debugger::printf("Artwork fallback: getServiceByGuid END, present=%i.", aaServiceFactory != NULL);
 	if (aaServiceFactory != NULL)
 	{
+		Debugger::print("Artwork fallback: getInterface BEGIN.");
 		api_albumart* const aaService =
 			(api_albumart*) aaServiceFactory->getInterface(FALSE);
+		Debugger::printf("Artwork fallback: getInterface END, present=%i.", aaService != NULL);
 		if (aaService != NULL)
 		{
 			int       wdth = 0;
 			int       hght = 0;
 			ARGB32*   data = 0;
+			Debugger::print("Artwork fallback: GetAlbumArt BEGIN.");
 			const int code = aaService->GetAlbumArt(
 				filePath, infoType, &wdth, &hght, &data);
+			Debugger::printf("Artwork fallback: GetAlbumArt END, code=%i, width=%i, height=%i, data=%i.",
+				code, wdth, hght, data != NULL);
 			if (code == ALBUMART_SUCCESS && data != 0)
 			{
 				if (wdth > 0 && hght > 0)
@@ -183,10 +213,16 @@ static void GetVisualFileInfo2(buffer_t& imageData, std::string& imageType,
 					imageType = "image/jpeg";
 				}
 
-				if (data) memMgmtService->sysFree(data);
+				if (data) {
+					Debugger::print("Artwork fallback: free pixels BEGIN.");
+					memMgmtService->sysFree(data);
+					Debugger::print("Artwork fallback: free pixels END.");
+				}
 			}
 
+			Debugger::print("Artwork fallback: releaseInterface BEGIN.");
 			aaServiceFactory->releaseInterface(aaService);
+			Debugger::print("Artwork fallback: releaseInterface END.");
 		}
 
 	}
@@ -198,34 +234,58 @@ static buffer_t ToJPEG(ARGB32* const data, const int wdth, const int hght,
 {
 	buffer_t jpeg(0);
 
+	Debugger::print("Artwork JPEG: count encoders BEGIN.");
 	const size_t n = apiService->service_getNumServices(
 						svc_imageWriter::getServiceType());
+	Debugger::printf("Artwork JPEG: count encoders END, count=%u.", (unsigned int) n);
 	for (size_t i = 0; i < n; ++i)
 	{
+		Debugger::printf("Artwork JPEG encoder %u: enum BEGIN.", (unsigned int) i);
 		waServiceFactory* const imgServiceFactory =
 			apiService->service_enumService(svc_imageWriter::getServiceType(), i);
+		Debugger::printf("Artwork JPEG encoder %u: enum END, present=%i.", (unsigned int) i, imgServiceFactory != NULL);
 		if (imgServiceFactory != NULL)
 		{
+			Debugger::print("Artwork JPEG: getInterface BEGIN.");
 			svc_imageWriter* const imgService =
 				(svc_imageWriter*) imgServiceFactory->getInterface(FALSE);
+			Debugger::printf("Artwork JPEG: getInterface END, present=%i.", imgService != NULL);
 			if (imgService != NULL)
 			{
-				if (imgService->bitDepthSupported(32)
-					&& imgService->getImageTypeName() != NULL
-					&& imgService->getImageTypeName() == std::wstring(L"JPEG"))
+				Debugger::print("Artwork JPEG: querying encoder capabilities BEGIN.");
+				const bool supports32 = imgService->bitDepthSupported(32);
+				Debugger::printf("Artwork JPEG: bitDepthSupported END, supports32=%i.", (int) supports32);
+				const wchar_t* typeName = NULL;
+				if (supports32) {
+					Debugger::print("Artwork JPEG: getImageTypeName BEGIN.");
+					typeName = imgService->getImageTypeName();
+					Debugger::printf("Artwork JPEG: getImageTypeName END, present=%i.", typeName != NULL);
+				}
+				Debugger::print("Artwork JPEG: matching type name BEGIN.");
+				const bool isJpeg = typeName && typeName == std::wstring(L"JPEG");
+				Debugger::printf("Artwork JPEG: matching type name END, isJpeg=%i.", (int) isJpeg);
+				if (isJpeg)
 				{
+					Debugger::print("Artwork JPEG: matching encoder; convert BEGIN.");
 					int   jpegSize = 0;
 					void* jpegData = imgService->convert(data, 32, wdth, hght, &jpegSize);
+					Debugger::printf("Artwork JPEG: convert END, bytes=%i, data=%i.", jpegSize, jpegData != NULL);
 					if (jpegData != NULL && jpegSize > 0)
 					{
 						jpeg.resize(jpegSize);
 						std::memcpy(&jpeg[0], jpegData, jpegSize);
 					}
 
-					if (jpegData) memMgmtService->sysFree(jpegData);
+					if (jpegData) {
+						Debugger::print("Artwork JPEG: free JPEG BEGIN.");
+						memMgmtService->sysFree(jpegData);
+						Debugger::print("Artwork JPEG: free JPEG END.");
+					}
 				}
 
+				Debugger::print("Artwork JPEG: releaseInterface BEGIN.");
 				imgServiceFactory->releaseInterface(imgService);
+				Debugger::print("Artwork JPEG: releaseInterface END.");
 			}
 
 		}

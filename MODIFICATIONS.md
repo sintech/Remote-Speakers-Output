@@ -1,5 +1,13 @@
 # Changes from upstream 5.6
 
+Artwork call tracing, 2026-11-16:
+
+- Add BEGIN/END markers around existing provider enumeration, interface lookup,
+  IsMine/GetAlbumArtData calls, copying/freeing buffers, the existing fallback
+  album-art API and the existing JPEG writer. Keep the current artwork path.
+- Record EnableArtwork at initialization so logs identify whether it was tested.
+- Read the JPEG writer's type name once and log capability/type checks separately.
+
 Artwork provider safety, 2026-11-16:
 
 - Disable artwork retrieval by default (`EnableArtwork=0`) following a host crash

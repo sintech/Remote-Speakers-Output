@@ -119,6 +119,8 @@ void Output::init()
 
 		// load plug-in options from file
 		OptionsUtils::loadOptions(_iniFilePath);
+		Debugger::printf("Artwork diagnostics: EnableArtwork=%u.",
+			GetPrivateProfileIntA(Plugin::name().c_str(), "EnableArtwork", 0, _iniFilePath.c_str()));
 
 		_outputComponent.reset(new OutputComponent(*player));
 		_outputComponent->setProgressCallback(&Output::onBytesOutput);
