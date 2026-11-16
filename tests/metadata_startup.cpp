@@ -9,6 +9,7 @@
 #include <cstring>
 #include <OptionsUtils.h>
 #include <wasabi/api_service.h>
+#include <wasabi/services.h>
 #include <wasabi/api_albumart.h>
 #include <atlbase.h>
 #include <wincodec.h>
