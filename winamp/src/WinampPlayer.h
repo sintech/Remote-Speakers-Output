@@ -1,3 +1,4 @@
+// Modified 2026-11-16: defer startup metadata and validate IPC pointers.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -51,7 +52,8 @@ public:
 		std::string& artist,
 		buffer_t   & artworkData,
 		std::string& artworkType,
-		shorts_t   & playlistPos) const;
+		shorts_t   & playlistPos,
+		bool allowFileMetadata = true) const;
 
 	time_t getPlaybackPosition() const;
 

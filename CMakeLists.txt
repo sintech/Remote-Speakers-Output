@@ -61,6 +61,14 @@ enable_testing()
 add_executable(plugin_smoke tests/plugin_smoke.cpp)
 target_include_directories(plugin_smoke PRIVATE winamp/sdk)
 add_test(NAME plugin_load COMMAND plugin_smoke "$<TARGET_FILE:out_apx>")
+add_executable(metadata_startup tests/metadata_startup.cpp winamp/src/WinampPlayer.cpp)
+target_include_directories(metadata_startup PRIVATE winamp/src winamp/sdk rsoutput/sdk)
+target_compile_definitions(metadata_startup PRIVATE UNICODE _UNICODE NOMINMAX
+  WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601 _CRT_SECURE_NO_WARNINGS)
+target_compile_options(metadata_startup PRIVATE /utf-8)
+target_link_libraries(metadata_startup PRIVATE apxCore ole32 oleaut32 shell32 user32)
+add_test(NAME metadata_startup_safety COMMAND metadata_startup)
+set_tests_properties(metadata_startup_safety PROPERTIES TIMEOUT 15)
 add_executable(core_startup tests/core_startup.cpp
   rsoutput/src/core/impl/raop/RAOPEngine.cpp
   rsoutput/src/core/impl/raop/RAOPDevice.cpp

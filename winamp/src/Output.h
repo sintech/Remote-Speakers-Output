@@ -1,3 +1,4 @@
+// Modified 2026-11-16: refresh metadata on the host UI thread after startup.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -19,6 +20,7 @@
 
 
 #include <ctime>
+#include <atomic>
 #include <memory>
 #include <string>
 #include <utility>
@@ -56,6 +58,10 @@ public:
 
 private:
 	static void onBytesOutput(size_t);
+	static void refreshMetadata();
+	static void CALLBACK metadataTimerProc(HWND, UINT, UINT_PTR, DWORD);
+	static std::atomic<bool> _metadataSessionReady;
+	static std::atomic<unsigned> _metadataRefreshAttempts;
 
 	typedef std::pair<int,double> Progress;
 	static void updateProgress(Progress&, size_t);

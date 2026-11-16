@@ -64,6 +64,8 @@ Output::Progress::second_type Output::_msecDivisor(0);
 std::string Output::_iniFilePath;
 std::time_t Output::_resetToZero(0);
 std::string Output::_titleString(INVALID_TITLE);
+std::atomic<bool> Output::_metadataSessionReady(false);
+std::atomic<unsigned> Output::_metadataRefreshAttempts(0);
 
 
 //------------------------------------------------------------------------------
@@ -135,6 +137,8 @@ void Output::init()
 
 void Output::quit()
 {
+	_metadataSessionReady = false;
+	KillTimer(player->window(), reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc));
 	try
 	{
 		OutputComponentPtr outputComponent(_outputComponent);
@@ -227,6 +231,8 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 	try
 	{
 		_resetToZero = 0;
+		_metadataSessionReady = false;
+		KillTimer(player->window(), reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc));
 		_titleString = INVALID_TITLE;
 
 		// query player for metadata
@@ -234,9 +240,9 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 		buffer_t    artworkData;
 		std::string artworkType;
 		shorts_t    playlistPos;
-		Debugger::print("Winamp Open: querying track metadata.");
+		Debugger::print("Winamp Open: postponing metadata until playback starts.");
 		const time_t length = player->getPlaybackMetadata(
-			title, album, artist, artworkData, artworkType, playlistPos);
+			title, album, artist, artworkData, artworkType, playlistPos, false);
 		Debugger::print("Winamp Open: track metadata retrieved.");
 
 		const OutputFormat format(SampleRate(samplesPerSecond),
@@ -272,6 +278,8 @@ int Output::open(const int samplesPerSecond, const int channelCount,
 
 void Output::close()
 {
+	_metadataSessionReady = false;
+	KillTimer(player->window(), reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc));
 	try
 	{
 		ASSERT_NOT_NULL(_outputComponent);
@@ -322,6 +330,14 @@ int Output::write(char* const buffer, const int length)
 			_outputComponent->write((byte_t*) buffer, length))
 		{
 			updateProgress(_bufferProgress, length);
+			// First PCM data means the input decoder has finished its Open path.
+			if (length > 0 && !_metadataSessionReady.exchange(true))
+			{
+				_metadataRefreshAttempts = 0;
+				if (!SetTimer(player->window(), reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc),
+					250, NULL))
+					Debugger::printLastError("Scheduling deferred metadata");
+			}
 			return 0;
 		}
 		else
@@ -458,46 +474,75 @@ void Output::updateProgress(Progress& progress, const size_t bytes)
 }
 
 
+void Output::refreshMetadata()
+{
+	if (!_metadataSessionReady.load()) return;
+	static thread_local bool refreshing = false;
+	if (refreshing) return;
+	struct Guard {
+		bool& value;
+		explicit Guard(bool& flag) : value(flag) { value = true; }
+		~Guard() { value = false; }
+	} guard(refreshing);
+	const LRESULT state = SendMessage(player->window(), WM_WA_IPC, 0, IPC_ISPLAYING);
+	if (state != 1 && state != 3) return;
+	try
+	{
+		Debugger::print("Processing title update notification from player...");
+
+		// re-query player for metadata
+		std::string title, album, artist;
+		buffer_t    artworkData;
+		std::string artworkType;
+		shorts_t    playlistPos;
+		const time_t length = player->getPlaybackMetadata(
+			title, album, artist, artworkData, artworkType, playlistPos);
+		const time_t offset = player->getPlaybackPosition();
+
+		Debugger::printf(
+			"New title is \"%s\"; last title sent to remote speakers was \"%s\".",
+			title.c_str(), _titleString.c_str());
+
+		// check for a change in the title but ignore buffer and connect updates
+		if (_titleString != title && !title.empty() && title[0] != '[')
+		{
+			ASSERT_NOT_NULL(_outputComponent);
+
+			const OutputMetadata metadata(
+				length, title, album, artist, playlistPos, artworkData, artworkType);
+
+			_outputComponent->setMetadata(metadata, offset);
+
+			_titleString = title;
+		}
+	}
+	CATCH_ALL
+}
+
+
+void CALLBACK Output::metadataTimerProc(HWND window, UINT, UINT_PTR id, DWORD)
+{
+	if (!_metadataSessionReady.load() || ++_metadataRefreshAttempts > 20)
+	{
+		KillTimer(window, id);
+		return;
+	}
+	const LRESULT state = SendMessage(window, WM_WA_IPC, 0, IPC_ISPLAYING);
+	if (state != 1 && state != 3) return;
+	refreshMetadata();
+	if (!_titleString.empty()) KillTimer(window, id);
+}
+
+
 LRESULT Output::playerWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	LRESULT result = CallWindowProc(_playerWindowProc, window, message, wParam, lParam);
-
-	// check for title update notification
-	if (message == WM_WA_IPC && lParam == IPC_CB_MISC && wParam == IPC_CB_MISC_TITLE
-		&& _titleString != INVALID_TITLE)
+	if (message == WM_TIMER && wParam == reinterpret_cast<UINT_PTR>(&Output::metadataTimerProc))
 	{
-		try
-		{
-			Debugger::print("Processing title update notification from player...");
-
-			// re-query player for metadata
-			std::string title, album, artist;
-			buffer_t    artworkData;
-			std::string artworkType;
-			shorts_t    playlistPos;
-			const time_t length = player->getPlaybackMetadata(
-				title, album, artist, artworkData, artworkType, playlistPos);
-			const time_t offset = player->getPlaybackPosition();
-
-			Debugger::printf(
-				"New title is \"%s\"; last title sent to remote speakers was \"%s\".",
-				title.c_str(), _titleString.c_str());
-
-			// check for a change in the title but ignore buffer and connect updates
-			if (_titleString != title && !title.empty() && title[0] != '[')
-			{
-				ASSERT_NOT_NULL(_outputComponent);
-
-				const OutputMetadata metadata(
-					length, title, album, artist, playlistPos, artworkData, artworkType);
-
-				_outputComponent->setMetadata(metadata, offset);
-
-				_titleString = title;
-			}
-		}
-		CATCH_ALL
+		metadataTimerProc(window, message, wParam, 0);
+		return 0;
 	}
-
+	LRESULT result = CallWindowProc(_playerWindowProc, window, message, wParam, lParam);
+	if (message == WM_WA_IPC && lParam == IPC_CB_MISC && wParam == IPC_CB_MISC_TITLE)
+		refreshMetadata();
 	return result;
 }

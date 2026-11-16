@@ -1,3 +1,4 @@
+// Modified 2026-11-16: defer startup metadata and validate IPC pointers.
 /* Copyright (c) 2020  Eric Milles <eric.milles@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -538,27 +539,44 @@ void WinampPlayer::toggleShuffle()
 
 
 time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
-	std::string& artist, buffer_t& artworkData, std::string& artworkType, shorts_t& listpos) const
+	std::string& artist, buffer_t& artworkData, std::string& artworkType, shorts_t& listpos,
+	const bool allowFileMetadata) const
 {
 	time_t length = 0; listpos = shorts_t(0,0);
 	title.clear(), album.clear(), artist.clear();
 	artworkData.resize(0), artworkType.assign("image/none");
 
-	const wchar_t* const filePath = sendMessage<wchar_t*>(IPC_GET_PLAYING_FILENAME);
-	if (filePath != NULL && filePath[0] != L'\0')
+	// Open runs inside decoder startup; do not re-enter tag/artwork services.
+	if (!allowFileMetadata || GetCurrentThreadId() != GetWindowThreadProcessId(window(), NULL))
 	{
+		Debugger::print("Metadata: deferred until the Winamp UI thread is ready.");
+		return 0;
+	}
+	const LRESULT state = SendMessage(window(), WM_WA_IPC, 0, IPC_ISPLAYING);
+	if (state != 1 && state != 3) return 0;
+	Debugger::print("Metadata: querying current filename on UI thread.");
+	const wchar_t* const borrowedPath = sendMessage<wchar_t*>(IPC_GET_PLAYING_FILENAME);
+	const std::wstring ownedPath = (borrowedPath != NULL &&
+		borrowedPath != reinterpret_cast<const wchar_t*>(1)) ? borrowedPath : L"";
+	const wchar_t* const filePath = ownedPath.c_str();
+	if (!ownedPath.empty())
+	{
+		Debugger::print("Metadata: querying basic file info.");
 		GetBasicFileInfo(length, filePath, window());
+		Debugger::print("Metadata: querying text tags.");
 		GetTextualFileInfo(title, L"Title", filePath, window());
 		GetTextualFileInfo(album, L"Album", filePath, window());
 		GetTextualFileInfo(artist, L"Artist", filePath, window());
 
 		if (_apiService == NULL)
 		{
+			Debugger::print("Metadata: acquiring Winamp services.");
 			// try to initialize player service interfaces
 			const_cast<WinampPlayer*>(this)->initServices();
 		}
 		if (_apiService != NULL && _memMgmtService != NULL)
 		{
+			Debugger::print("Metadata: querying album artwork.");
 			GetVisualFileInfo(artworkData, artworkType, L"cover",
 							filePath, _apiService, _memMgmtService);
 
@@ -594,7 +612,8 @@ time_t WinampPlayer::getPlaybackMetadata(std::string& title, std::string& album,
 	{
 		// try an alternate API for getting track title
 		const wchar_t* const wideCharTitle = sendMessage<wchar_t*>(IPC_GET_PLAYING_TITLE);
-		if (wideCharTitle != NULL && wideCharTitle[0] != L'\0')
+		if (wideCharTitle != NULL && wideCharTitle != reinterpret_cast<const wchar_t*>(1)
+			&& wideCharTitle[0] != L'\0')
 		{
 			title = ToUTF8(wideCharTitle);
 		}

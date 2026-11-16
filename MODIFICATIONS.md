@@ -1,5 +1,15 @@
 # Changes from upstream 5.6
 
+Winamp file-association startup safety, 2026-11-16:
+
+- Do not query file tags/artwork synchronously from the output Open callback,
+  which can run while Winamp's input decoder is still initializing.
+- Refresh metadata on the host UI thread after playback begins, using the window
+  subclass and a bounded timer; cancel the timer on close/quit. Prevent recursive
+  refresh when metadata services trigger another title notification.
+- Reject IPC pointer sentinel 1 and copy the host-owned filename before further
+  IPC calls. Added fake-host tests for startup, worker calls and pointer lifetime.
+
 Reduced start latency, 2026-11-16:
 
 - Connection readiness is checked every 25 ms instead of 250 ms. The 3-second
