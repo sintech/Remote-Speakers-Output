@@ -31,7 +31,7 @@ foreach ($dep in (Get-Content "$PSScriptRoot/dependencies.json" -Raw | ConvertFr
     if (-not (Test-Path $destination)) {
         New-Item -ItemType Directory $destination | Out-Null
         if ($dep.filename) { Copy-Item $download $destination }
-        else { Invoke-Checked tar @('-xzf', $download, '-C', $destination, '--strip-components=1') }
+        else { Invoke-Checked -program tar -arguments @('-xzf', $download, '-C', $destination, '--strip-components=1') }
     }
 }
 
@@ -48,10 +48,10 @@ $encoderText = [regex]::Replace($encoderText,
 if (-not (Test-Path "$prefix/lib/libcrypto.lib")) {
     Push-Location "$deps/openssl"
     try {
-        Invoke-Checked perl @('Configure', 'VC-WIN32', 'no-shared', 'no-module', 'no-asm',
+        Invoke-Checked -program perl -arguments @('Configure', 'VC-WIN32', 'no-shared', 'no-module', 'no-asm',
             'no-tests', 'no-apps', 'no-docs', '-MT', "--prefix=$prefix", '--libdir=lib')
-        Invoke-Checked nmake @('/NOLOGO', 'build_libs')
-        Invoke-Checked nmake @('/NOLOGO', 'install_dev')
+        Invoke-Checked -program nmake -arguments @('/NOLOGO', 'build_libs')
+        Invoke-Checked -program nmake -arguments @('/NOLOGO', 'install_dev')
     } finally { Pop-Location }
 }
 
@@ -66,14 +66,14 @@ if (-not (Test-Path "$prefix/lib/cmake/Poco/PocoConfig.cmake")) {
         'POCODOC', 'PAGECOMPILER', 'PAGECOMPILER_FILE2PAGE')) {
         $pocoArgs += "-DENABLE_${component}=OFF"
     }
-    Invoke-Checked cmake $pocoArgs
-    Invoke-Checked cmake @('--build', "$deps/poco-build", '--config', 'Release', '--target', 'install', '--parallel', '2')
+    Invoke-Checked -program cmake -arguments $pocoArgs
+    Invoke-Checked -program cmake -arguments @('--build', "$deps/poco-build", '--config', 'Release', '--target', 'install', '--parallel', '2')
 }
 
-Invoke-Checked cmake @('-S', $root, '-B', 'build', '-G', 'Visual Studio 17 2022', '-A', 'Win32')
-Invoke-Checked cmake @('--build', 'build', '--config', 'Release', '--parallel', '2')
-Invoke-Checked ctest @('--test-dir', 'build', '-C', 'Release', '--output-on-failure')
-Invoke-Checked cmake @('--install', 'build', '--config', 'Release', '--prefix', 'dist')
+Invoke-Checked -program cmake -arguments @('-S', $root, '-B', 'build', '-G', 'Visual Studio 17 2022', '-A', 'Win32')
+Invoke-Checked -program cmake -arguments @('--build', 'build', '--config', 'Release', '--parallel', '2')
+Invoke-Checked -program ctest -arguments @('--test-dir', 'build', '-C', 'Release', '--output-on-failure')
+Invoke-Checked -program cmake -arguments @('--install', 'build', '--config', 'Release', '--prefix', 'dist')
 
 New-Item -ItemType Directory -Force 'dist/licenses' | Out-Null
 Copy-Item 'LICENSE*', 'README.md', 'MODIFICATIONS.md', 'scripts/dependencies.json' 'dist/'
